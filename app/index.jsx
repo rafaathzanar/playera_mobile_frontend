@@ -49,7 +49,7 @@ const Welcome = () => {
 
           <CustomButton
             title="Continue with Email"
-            handlePress={() => router.push("/signin")}
+            handlePress={() => router.push("/sign-in")}
             containerStyles="w-full mt-7"
           />
         </View>
