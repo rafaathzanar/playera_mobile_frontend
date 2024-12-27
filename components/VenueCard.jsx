@@ -10,7 +10,7 @@ const VenueCard = ({ name, address, contact, image, isOpen, closingTime }) => {
   };
 
   return (
-    <View className="border rounded-lg overflow-hidden bg-white shadow-lg mb-4">
+    <View className="border border-secondary rounded-lg overflow-hidden bg-white shadow-lg mb-4">
       
       <Image
         source={{ uri: image }}

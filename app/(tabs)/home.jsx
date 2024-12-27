@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { SafeAreaView, View, Text, TextInput, ScrollView } from "react-native";
 import VenueCard from "../../components/VenueCard"; // Adjust path based on your file structure
-
 const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -12,7 +11,7 @@ const HomeScreen = () => {
       name: "Colombo Futsal Club",
       address: "70 Galle Road, Dehiwala",
       contact: "077 969 4278",
-      image: "https://example.com/futsal-image.jpg", 
+      image: "https://t4.ftcdn.net/jpg/09/09/73/81/360_F_909738157_hkL2e79FofzkMcEy9DUiIHe3HrHX4jJP.jpg", 
       isOpen: true,
       closingTime: "12 AM",
     },
@@ -21,7 +20,7 @@ const HomeScreen = () => {
       name: "Royal Tennis Court",
       address: "123 Main Street, Colombo",
       contact: "077 111 2222",
-      image: "https://example.com/tennis-image.jpg", 
+      image: "https://t4.ftcdn.net/jpg/09/09/73/81/360_F_909738157_hkL2e79FofzkMcEy9DUiIHe3HrHX4jJP.jpg", 
       isOpen: false,
       closingTime: "10 PM",
     },
@@ -33,7 +32,7 @@ const HomeScreen = () => {
       name: "Elite Swimming Pool",
       address: "45 Park Avenue, Colombo",
       contact: "077 333 4444",
-      image: "https://example.com/pool-image.jpg", 
+      image: "https://salfordcommunityleisure.co.uk/wp-content/uploads/2021/07/Swim-For-All-WEB-2000x846.png", 
       isOpen: true,
       closingTime: "9 PM",
     },
@@ -42,10 +41,10 @@ const HomeScreen = () => {
   return (
     <SafeAreaView className="flex-1 bg-white">
       
-      <View className="p-4 bg-white shadow-sm">
-        <Text className="text-2xl font-bold text-gray-800 mb-2">Hello, John!</Text>
+      <View className="p-4 bg-white">
+        <Text className="text-2xl font-bold text-gray-800 mb-2">Hello,Mohammed!</Text>
         <TextInput
-          className="bg-white p-3 rounded-lg text-gray-700 border border-secondary"
+          className="bg-white mt-6 p-3 rounded-lg text-gray-700 border border-black"
           placeholder="Search for venues"
           placeholderTextColor="black" 
           value={searchQuery}
