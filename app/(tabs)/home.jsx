@@ -36,6 +36,24 @@ const HomeScreen = () => {
       isOpen: true,
       closingTime: "9 PM",
     },
+    {
+      id: "4",
+      name: "NNN Summer Cricket Club",
+      address: "45 Street Hammer, Colombo",
+      contact: "077 555 444",
+      image: "https://salfordcommunityleisure.co.uk/wp-content/uploads/2021/07/Swim-For-All-WEB-2000x846.png", 
+      isOpen: true,
+      closingTime: "9 PM",
+    },
+    {
+      id: "5",
+      name: "Elite Swimming Pool",
+      address: "45 Park Avenue, Colombo",
+      contact: "077 333 4444",
+      image: "https://salfordcommunityleisure.co.uk/wp-content/uploads/2021/07/Swim-For-All-WEB-2000x846.png", 
+      isOpen: true,
+      closingTime: "9 PM",
+    },
   ];
 
   return (
