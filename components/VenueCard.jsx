@@ -1,53 +1,19 @@
-import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { TouchableOpacity, Text, View, Image } from "react-native";
 
-const VenueCard = ({ name, address, contact, image, isOpen, closingTime }) => {
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-  };
-
+export default function VenueCard({ onPress, name, address, contact, image, isOpen, closingTime }) {
   return (
-    <View className="border border-secondary rounded-lg overflow-hidden bg-white shadow-lg mb-4">
-      
+    <TouchableOpacity onPress={onPress} className="bg-white rounded-lg shadow m-2 p-3 w-60">
       <Image
         source={{ uri: image }}
-        className="w-full h-40"
+        className="w-full h-24 rounded"
         resizeMode="cover"
       />
-
-      
-      <View className="p-4">
-        <View className="flex-row justify-between items-center mb-2">
-          <Text className="text-lg font-bold text-black">{name}</Text>
-          <TouchableOpacity onPress={toggleFavorite}>
-            <Ionicons
-              name={isFavorite ? "heart" : "heart-outline"}
-              size={24}
-              color={isFavorite ? "red" : "black"}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <Text className="text-gray-600 mb-1">{address}</Text>
-        <Text className="text-gray-600 mb-3">{contact}</Text>
-
-        
-        <View className="flex-row items-center">
-          <View
-            className={`w-3 h-3 rounded-full mr-2 ${
-              isOpen ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <Text className="text-gray-600">
-            {isOpen ? "Open" : "Closed"} · Closes {closingTime}
-          </Text>
-        </View>
-      </View>
-    </View>
+      <Text className="mt-2 text-lg font-bold">{name}</Text>
+      <Text className="text-gray-600">{address}</Text>
+      <Text className="text-gray-800">
+        {isOpen ? "Open" : "Closed"} · Closes {closingTime}
+      </Text>
+    </TouchableOpacity>
   );
-};
-
-export default VenueCard;
+}
