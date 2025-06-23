@@ -1,5 +1,5 @@
 {
-  "name": "playera_mobile",
+  "name": "playera_app",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -15,7 +15,6 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "@expo/config-plugins": "~10.0.0",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-navigation/bottom-tabs": "^7.2.0",
