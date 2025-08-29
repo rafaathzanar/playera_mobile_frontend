@@ -1,64 +1,86 @@
 import React, { useState, useEffect } from "react";
-import { SafeAreaView, ScrollView, TouchableOpacity, Text, View, Alert } from "react-native";
-import { Calendar } from "react-native-calendars";
+import {
+  SafeAreaView,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeftIcon } from 'react-native-heroicons/solid';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../contexts/AuthContext';
-import api from '../../services/api';
+import { ArrowLeftIcon } from "react-native-heroicons/solid";
+import { useNavigation } from "@react-navigation/native";
+import { Calendar } from "react-native-calendars";
+import { useAuth } from "../../contexts/AuthContext";
+import api from "../../services/api";
 
 export default function SlotSelection() {
-  const router = useRouter();
   const { venueId, courtId } = useLocalSearchParams();
-  const [selectedSlots, setSelectedSlots] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [court, setCourt] = useState(null);
-  const [venue, setVenue] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
 
-  // Fetch court and venue details
+  // State
+  const [selectedDate, setSelectedDate] = useState("");
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [court, setCourt] = useState(null);
+  const [venue, setVenue] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [equipment, setEquipment] = useState([]);
+  const [selectedEquipment, setSelectedEquipment] = useState({});
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
+
+  // Fetch court, venue, and equipment data
   useEffect(() => {
     const fetchCourtAndVenueDetails = async () => {
       try {
         setLoading(true);
         
         // Fetch court details
-        if (courtId) {
-          const courtData = await api.getCourtById(courtId);
-          setCourt(courtData);
-          
-          // Fetch venue details
-          if (courtData.venue) {
-            setVenue(courtData.venue);
-          }
-        }
+        const courtData = await api.getCourtById(courtId);
+        setCourt(courtData);
         
-        // Fetch available slots for today
-        if (courtId && selectedDate) {
-          await fetchAvailableSlots(selectedDate);
-        }
+        // Fetch venue details
+        const venueData = await api.getVenueById(venueId);
+        setVenue(venueData);
+        
+        // Fetch available equipment for this venue
+        await fetchEquipment();
+        
       } catch (error) {
-        console.error('Error fetching court/venue details:', error);
-        Alert.alert('Error', 'Failed to load court information');
+        console.error("Error fetching court and venue details:", error);
+        Alert.alert("Error", "Failed to load court and venue information");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourtAndVenueDetails();
-  }, [courtId]);
+    if (courtId && venueId) {
+      fetchCourtAndVenueDetails();
+    }
+  }, [courtId, venueId]);
 
-  // Fetch available slots when date changes
+  // Fetch available equipment
+  const fetchEquipment = async () => {
+    try {
+      setEquipmentLoading(true);
+      const equipmentData = await api.getEquipment(venueId);
+      setEquipment(equipmentData);
+    } catch (error) {
+      console.error("Error fetching equipment:", error);
+      // Don't show alert for equipment, just log the error
+    } finally {
+      setEquipmentLoading(false);
+    }
+  };
+
+  // Fetch available slots for selected date
   const fetchAvailableSlots = async (date) => {
     try {
       if (!courtId || !date) return;
-      
       const slots = await api.getAvailableSlots(courtId, date);
-      
-      // Convert backend slots to frontend format
       const formattedSlots = slots.map(slot => ({
         id: slot.id,
         time: `${slot.startTime} - ${slot.endTime}`,
@@ -67,7 +89,6 @@ export default function SlotSelection() {
         available: slot.status === 'AVAILABLE',
         slot: slot
       }));
-      
       setAvailableSlots(formattedSlots);
     } catch (error) {
       console.error('Error fetching available slots:', error);
@@ -76,18 +97,18 @@ export default function SlotSelection() {
   };
 
   // Handle date selection
-  const handleDateSelect = (day) => {
-    const newDate = day.dateString;
-    setSelectedDate(newDate);
+  const handleDateSelect = (date) => {
+    setSelectedDate(date.dateString);
     setSelectedSlots([]); // Reset selected slots when date changes
-    fetchAvailableSlots(newDate);
+    fetchAvailableSlots(date.dateString);
   };
 
+  // Toggle slot selection
   const toggleSlot = (slot) => {
     if (!slot.available) return;
     
-    setSelectedSlots((prev) => {
-      const isSelected = prev.some(s => s.id === slot.id);
+    setSelectedSlots(prev => {
+      const isSelected = prev.find(s => s.id === slot.id);
       if (isSelected) {
         return prev.filter(s => s.id !== slot.id);
       } else {
@@ -96,178 +117,312 @@ export default function SlotSelection() {
     });
   };
 
-  const handleProceed = () => {
-    if (selectedSlots.length === 0) {
-      Alert.alert('No Slots Selected', 'Please select at least one time slot to continue.');
-      return;
-    }
-
-    // Calculate total duration and cost
-    const totalDuration = selectedSlots.length * 0.5; // 30 minutes per slot
-    const totalCost = court ? (court.pricePerHour * totalDuration) : 0;
-
-    // Navigate to order summary with booking details
-    router.push({
-      pathname: '/booking/order-summary',
-      params: {
-        venueId: venueId,
-        courtId: courtId,
-        date: selectedDate,
-        slots: encodeURIComponent(JSON.stringify(selectedSlots)),
-        totalDuration: totalDuration,
-        totalCost: totalCost,
-        courtName: court?.courtName || 'Unknown Court',
-        venueName: venue?.name || 'Unknown Venue'
+  // Toggle equipment selection
+  const toggleEquipment = (equipmentItem) => {
+    setSelectedEquipment(prev => {
+      const current = prev[equipmentItem.id] || 0;
+      if (current > 0) {
+        const newState = { ...prev };
+        if (current === 1) {
+          delete newState[equipmentItem.id];
+        } else {
+          newState[equipmentItem.id] = current - 1;
+        }
+        return newState;
+      } else {
+        return { ...prev, [equipmentItem.id]: 1 };
       }
     });
   };
 
-  // Format time for display
-  const formatTime = (timeString) => {
-    try {
-      const [hours, minutes] = timeString.split(':');
-      const hour = parseInt(hours);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      return `${displayHour}:${minutes} ${ampm}`;
-    } catch (error) {
-      return timeString;
+  // Increase equipment quantity
+  const increaseEquipmentQuantity = (equipmentId) => {
+    setSelectedEquipment(prev => ({
+      ...prev,
+      [equipmentId]: (prev[equipmentId] || 0) + 1
+    }));
+  };
+
+  // Decrease equipment quantity
+  const decreaseEquipmentQuantity = (equipmentId) => {
+    setSelectedEquipment(prev => {
+      const current = prev[equipmentId] || 0;
+      if (current <= 1) {
+        const newState = { ...prev };
+        delete newState[equipmentId];
+        return newState;
+      }
+      return { ...prev, [equipmentId]: current - 1 };
+    });
+  };
+
+  // Calculate total duration and cost
+  const calculateTotals = () => {
+    const totalDuration = selectedSlots.length * 0.5; // 30 minutes per slot
+    const courtCost = court ? court.pricePerHour * totalDuration : 0;
+    
+    let equipmentCost = 0;
+    Object.entries(selectedEquipment).forEach(([equipmentId, quantity]) => {
+      const equipmentItem = equipment.find(e => e.id == equipmentId);
+      if (equipmentItem) {
+        equipmentCost += equipmentItem.ratePerHour * quantity * totalDuration;
+      }
+    });
+    
+    const totalCost = courtCost + equipmentCost;
+    
+    return { totalDuration, courtCost, equipmentCost, totalCost };
+  };
+
+  // Handle proceed to order summary
+  const handleProceed = () => {
+    if (selectedSlots.length === 0) {
+      Alert.alert("No Slots Selected", "Please select at least one time slot.");
+      return;
     }
+
+    const { totalDuration, totalCost } = calculateTotals();
+    
+    // Prepare equipment data for next page
+    const selectedEquipmentData = Object.entries(selectedEquipment).map(([equipmentId, quantity]) => {
+      const equipmentItem = equipment.find(e => e.id == equipmentId);
+      return {
+        id: equipmentItem.id,
+        name: equipmentItem.name,
+        quantity: quantity,
+        ratePerHour: equipmentItem.ratePerHour,
+        totalCost: equipmentItem.ratePerHour * quantity * totalDuration
+      };
+    });
+
+    router.push({
+      pathname: "/booking/order-summary",
+      params: {
+        venueId,
+        courtId,
+        selectedDate,
+        startTime: selectedSlots[0].startTime,
+        endTime: selectedSlots[selectedSlots.length - 1].endTime,
+        totalDuration,
+        totalCost,
+        courtName: court?.courtName,
+        venueName: venue?.name,
+        selectedSlots: JSON.stringify(selectedSlots),
+        selectedEquipment: JSON.stringify(selectedEquipmentData)
+      }
+    });
   };
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-1 justify-center items-center">
-          <Text className="text-lg">Loading...</Text>
-        </View>
+      <SafeAreaView className="flex-1 justify-center items-center">
+        <Text className="text-xl text-gray-600">Loading...</Text>
       </SafeAreaView>
     );
   }
 
+  const { totalDuration, courtCost, equipmentCost, totalCost } = calculateTotals();
+
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View>
-        <View className="flex-row items-center p-2" style={{ backgroundColor: '#FF4B00' }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} className="pr-1">
-            <ArrowLeftIcon size={20} color="white" style={{ marginLeft: 15 }} />
+      <ScrollView>
+        {/* Header */}
+        <View className="flex-row items-center p-4 bg-orange-500">
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <ArrowLeftIcon size={24} color="white" />
           </TouchableOpacity>
-          <Text className="font-bold text-lg text-white text-center flex-1">
-            {court?.courtName || 'COURT BOOKING'}
-          </Text>
-          <View style={{ width: 24 }} />
+          <Text className="text-xl font-bold text-white ml-4">Select Slots & Equipment</Text>
         </View>
-      </View>
 
-      <ScrollView className="p-4">
         {/* Court and Venue Info */}
-        {court && (
-          <View className="bg-gray-50 p-4 rounded-lg mb-4">
-            <Text className="text-lg font-bold text-gray-800">{court.courtName}</Text>
-            <Text className="text-gray-600">{venue?.name}</Text>
-            <Text className="text-gray-600">Type: {court.type}</Text>
-            <Text className="text-gray-600">Price: LKR {court.pricePerHour}/hour</Text>
-            {court.description && (
-              <Text className="text-gray-600 mt-2">{court.description}</Text>
-            )}
-          </View>
-        )}
+        <View className="p-4 bg-gray-50">
+          <Text className="text-2xl font-bold text-gray-800">{court?.courtName}</Text>
+          <Text className="text-lg text-gray-600">{venue?.name}</Text>
+          <Text className="text-gray-600">Price: LKR {court?.pricePerHour}/hour</Text>
+        </View>
 
-        {/* Selected Date */}
-        <Text className="text-lg text-orange-500 mb-4">{selectedDate}</Text>
-
-        {/* Interactive Calendar */}
-        <Calendar
-          current={selectedDate}
-          onDayPress={handleDateSelect}
-          markedDates={{
-            [selectedDate]: { selected: true, selectedColor: "#FF4B00" },
-          }}
-          theme={{
-            backgroundColor: "white",
-            calendarBackground: "white",
-            textSectionTitleColor: "#000",
-            dayTextColor: "#000",
-            arrowColor: "#FF4B00",
-            todayTextColor: "#FF4B00",
-          }}
-          style={{ marginBottom: 16, borderRadius: 8, elevation: 2 }}
-          minDate={new Date().toISOString().split('T')[0]}
-        />
+        {/* Calendar */}
+        <View className="p-4">
+          <Text className="text-lg font-semibold mb-3">Select Date</Text>
+          <Calendar
+            onDayPress={handleDateSelect}
+            markedDates={{
+              [selectedDate]: { selected: true, selectedColor: '#FF4B00' }
+            }}
+            minDate={new Date().toISOString().split('T')[0]}
+            theme={{
+              selectedDayBackgroundColor: '#FF4B00',
+              selectedDayTextColor: '#ffffff',
+              todayTextColor: '#FF4B00',
+              arrowColor: '#FF4B00',
+            }}
+          />
+        </View>
 
         {/* Available Slots */}
-        <Text className="text-lg font-bold mb-4">Available Time Slots</Text>
-        
-        {availableSlots.length === 0 ? (
-          <View className="bg-gray-100 p-4 rounded-lg">
-            <Text className="text-center text-gray-600">No available slots for this date</Text>
-          </View>
-        ) : (
-          availableSlots.map((slot) => (
-            <View key={slot.id} className="flex-row justify-between items-center p-3 mb-2 bg-white border border-gray-200 rounded-lg">
-              <Text style={{ color: '#FF4B00' }} className="font-medium">
-                {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => toggleSlot(slot)}
-                className={`px-6 py-2 rounded-lg ${
-                  selectedSlots.some(s => s.id === slot.id) 
-                    ? "bg-orange-500" 
-                    : slot.available 
-                      ? "bg-gray-200" 
-                      : "bg-gray-400"
-                }`}
-                disabled={!slot.available}
-              >
-                <Text className={`${
-                  selectedSlots.some(s => s.id === slot.id) 
-                    ? "text-white" 
-                    : "text-black"
-                } font-medium`}>
-                  {selectedSlots.some(s => s.id === slot.id) ? "Selected" : "Available"}
-                </Text>
-              </TouchableOpacity>
+        {selectedDate && (
+          <View className="p-4">
+            <Text className="text-lg font-semibold mb-3">Available Time Slots</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {availableSlots.map((slot) => {
+                const isSelected = selectedSlots.find(s => s.id === slot.id);
+                return (
+                  <TouchableOpacity
+                    key={slot.id}
+                    onPress={() => toggleSlot(slot)}
+                    disabled={!slot.available}
+                    className={`px-4 py-3 rounded-lg border-2 ${
+                      isSelected
+                        ? "bg-orange-500 border-orange-500"
+                        : slot.available
+                        ? "bg-white border-gray-300"
+                        : "bg-gray-200 border-gray-200"
+                    }`}
+                  >
+                    <Text
+                      className={`font-medium ${
+                        isSelected
+                          ? "text-white"
+                          : slot.available
+                          ? "text-gray-800"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {slot.time}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          ))
+          </View>
         )}
 
-        {/* Selected Slots Summary */}
+        {/* Equipment Selection */}
+        <View className="p-4">
+          <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
+          {equipmentLoading ? (
+            <Text className="text-gray-600">Loading equipment...</Text>
+          ) : equipment.length > 0 ? (
+            <View className="space-y-3">
+              {equipment.map((equipmentItem) => {
+                const selectedQuantity = selectedEquipment[equipmentItem.id] || 0;
+                const isAvailable = equipmentItem.availableQuantity > 0;
+                
+                return (
+                  <View
+                    key={equipmentItem.id}
+                    className={`p-4 rounded-lg border-2 ${
+                      selectedQuantity > 0
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-gray-200 bg-white"
+                    }`}
+                  >
+                    <View className="flex-row justify-between items-center mb-2">
+                      <View className="flex-1">
+                        <Text className="text-lg font-semibold text-gray-800">
+                          {equipmentItem.name}
+                        </Text>
+                        <Text className="text-gray-600 text-sm">
+                          {equipmentItem.description}
+                        </Text>
+                        <Text className="text-gray-700 font-medium">
+                          LKR {equipmentItem.ratePerHour}/hour
+                        </Text>
+                        <Text className="text-gray-500 text-sm">
+                          Available: {equipmentItem.availableQuantity}
+                        </Text>
+                      </View>
+                      
+                      <View className="flex-row items-center space-x-2">
+                        <TouchableOpacity
+                          onPress={() => decreaseEquipmentQuantity(equipmentItem.id)}
+                          disabled={selectedQuantity === 0}
+                          className={`w-8 h-8 rounded-full justify-center items-center ${
+                            selectedQuantity === 0
+                              ? "bg-gray-200"
+                              : "bg-orange-500"
+                          }`}
+                        >
+                          <Text className="text-white font-bold text-lg">-</Text>
+                        </TouchableOpacity>
+                        
+                        <Text className="text-lg font-semibold min-w-[20px] text-center">
+                          {selectedQuantity}
+                        </Text>
+                        
+                        <TouchableOpacity
+                          onPress={() => increaseEquipmentQuantity(equipmentItem.id)}
+                          disabled={!isAvailable || selectedQuantity >= equipmentItem.availableQuantity}
+                          className={`w-8 h-8 rounded-full justify-center items-center ${
+                            !isAvailable || selectedQuantity >= equipmentItem.availableQuantity
+                              ? "bg-gray-200"
+                              : "bg-orange-500"
+                          }`}
+                        >
+                          <Text className="text-white font-bold text-lg">+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text className="text-gray-600">No equipment available for this venue</Text>
+          )}
+        </View>
+
+        {/* Summary */}
         {selectedSlots.length > 0 && (
-          <View className="bg-orange-50 p-4 rounded-lg mt-4 mb-4">
-            <Text className="text-lg font-bold text-orange-800 mb-2">
-              Selected Slots ({selectedSlots.length})
-            </Text>
-            {selectedSlots.map((slot, index) => (
-              <Text key={index} className="text-orange-700">
-                • {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-              </Text>
-            ))}
-            <Text className="text-lg font-bold text-orange-800 mt-2">
-              Total Duration: {(selectedSlots.length * 0.5).toFixed(1)} hours
-            </Text>
-            {court && (
-              <Text className="text-lg font-bold text-orange-800">
-                Total Cost: LKR {(court.pricePerHour * selectedSlots.length * 0.5).toFixed(2)}
-              </Text>
-            )}
+          <View className="p-4 bg-gray-50">
+            <Text className="text-lg font-semibold mb-3">Booking Summary</Text>
+            <View className="space-y-2">
+              <View className="flex-row justify-between">
+                <Text className="text-gray-600">Selected Slots:</Text>
+                <Text className="text-gray-800 font-medium">{selectedSlots.length} slots</Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-gray-600">Total Duration:</Text>
+                <Text className="text-gray-800 font-medium">{totalDuration} hours</Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-gray-600">Court Cost:</Text>
+                <Text className="text-gray-800 font-medium">LKR {courtCost.toFixed(2)}</Text>
+              </View>
+              {equipmentCost > 0 && (
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Equipment Cost:</Text>
+                  <Text className="text-gray-800 font-medium">LKR {equipmentCost.toFixed(2)}</Text>
+                </View>
+              )}
+              <View className="border-t border-gray-300 pt-2 mt-2">
+                <View className="flex-row justify-between">
+                  <Text className="text-lg font-semibold">Total Cost:</Text>
+                  <Text className="text-lg font-bold text-orange-600">LKR {totalCost.toFixed(2)}</Text>
+                </View>
+              </View>
+            </View>
           </View>
         )}
 
         {/* Proceed Button */}
-        <TouchableOpacity
-          onPress={handleProceed}
-          disabled={selectedSlots.length === 0}
-          className={`mt-6 p-3 rounded-lg mr-3 ml-3 ${
-            selectedSlots.length > 0 ? "bg-orange-500" : "bg-gray-300"
-          }`}
-        >
-          <Text className={`text-center font-bold ${
-            selectedSlots.length > 0 ? "text-white" : "text-gray-500"
-          }`}>
-            Confirm and Checkout ({selectedSlots.length} slots)
-          </Text>
-        </TouchableOpacity>
+        <View className="p-4">
+          <TouchableOpacity
+            onPress={handleProceed}
+            disabled={selectedSlots.length === 0}
+            className={`p-4 rounded-lg ${
+              selectedSlots.length === 0
+                ? "bg-gray-300"
+                : "bg-orange-500"
+            }`}
+          >
+            <Text className="text-white text-center font-bold text-lg">
+              {selectedSlots.length === 0
+                ? "Select Time Slots to Continue"
+                : "Proceed to Order Summary"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
