@@ -1,17 +1,19 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../contexts/AuthContext";
 
 const SignUpScreen = () => {
   const router = useRouter();
- const [user, setUser] = useState({
+  const { register, isLoading } = useAuth();
+  const [user, setUser] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
     phone: "",
-    address: "",
+    userType: "CUSTOMER", // Default to customer
   });
 
   const [errors, setErrors] = useState({
@@ -20,7 +22,6 @@ const SignUpScreen = () => {
     password: "",
     confirmPassword: "",
     phone: "",
-    address: "",
   });
 
   const validateFields = () => {
@@ -34,17 +35,31 @@ const SignUpScreen = () => {
       newErrors.confirmPassword = "Passwords do not match.";
     if (!user.phone.trim() || !/^\d{10}$/.test(user.phone))
       newErrors.phone = "Valid phone number is required.";
-    if (!user.address.trim()) newErrors.address = "Address is required.";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!validateFields()) return;
-    // Handle successful signup logic here
-    console.log("User Details:", user);
-    router.push("/welcome"); // Navigate to the welcome screen
+
+    try {
+      const userData = {
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        phone: user.phone,
+        userType: user.userType,
+        role: user.userType,
+      };
+
+      await register(userData);
+      Alert.alert("Success", "Account created successfully!", [
+        { text: "OK", onPress: () => router.push("/(tabs)/home") }
+      ]);
+    } catch (error) {
+      Alert.alert("Registration Failed", error.message || "Please try again");
+    }
   };
 
 
@@ -108,22 +123,49 @@ const SignUpScreen = () => {
         />
         {errors.phone ? <Text className="text-red-500">{errors.phone}</Text> : null}
 
-        {/* Address */}
-        <TextInput
-          className="w-full p-3 mb-4 rounded-lg border border-secondary"
-          placeholder="Address"
-          placeholderTextColor="#A9A9A9"
-          value={user.address}
-          onChangeText={(text) => setUser({ ...user, address: text })}
-          multiline
-        />
-        {errors.address ? <Text className="text-red-500">{errors.address}</Text> : null}
+        {/* User Type Selection */}
+        <View className="w-full mb-4">
+          <Text className="text-white mb-2">Account Type</Text>
+          <View className="flex-row space-x-2">
+            <TouchableOpacity
+              className={`flex-1 p-3 rounded-lg border ${
+                user.userType === 'CUSTOMER' ? 'bg-secondary border-secondary' : 'border-secondary'
+              }`}
+              onPress={() => setUser({ ...user, userType: 'CUSTOMER' })}
+            >
+              <Text className={`text-center ${
+                user.userType === 'CUSTOMER' ? 'text-white' : 'text-secondary'
+              }`}>
+                Customer
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={`flex-1 p-3 rounded-lg border ${
+                user.userType === 'VENUE_OWNER' ? 'bg-secondary border-secondary' : 'border-secondary'
+              }`}
+              onPress={() => setUser({ ...user, userType: 'VENUE_OWNER' })}
+            >
+              <Text className={`text-center ${
+                user.userType === 'VENUE_OWNER' ? 'text-white' : 'text-secondary'
+              }`}>
+                Venue Owner
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
       <TouchableOpacity
         onPress={handleSignUp}
-        className="w-full bg-secondary p-4 rounded-lg mb-4"
+        disabled={isLoading}
+        className={`w-full p-4 rounded-lg mb-4 ${
+          isLoading ? 'bg-gray-400' : 'bg-secondary'
+        }`}
       >
-        <Text className="text-center text-white font-bold">Sign Up</Text>
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-center text-white font-bold">Sign Up</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push("sign-in")}>

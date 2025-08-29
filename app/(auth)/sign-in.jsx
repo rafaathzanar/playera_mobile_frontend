@@ -1,16 +1,31 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../contexts/AuthContext";
 
 const SignInScreen = () => {
   const router = useRouter();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSignIn = () => {
-   
-    router.replace("/home");
+  const handleSignIn = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await login(email, password);
+      router.replace("/(tabs)/home");
+    } catch (error) {
+      Alert.alert("Login Failed", error.message || "Please check your credentials");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -36,9 +51,16 @@ const SignInScreen = () => {
 
       <TouchableOpacity
         onPress={handleSignIn}
-        className="w-full bg-secondary p-4 rounded-lg mb-4"
+        disabled={isSubmitting || isLoading}
+        className={`w-full p-4 rounded-lg mb-4 ${
+          isSubmitting || isLoading ? 'bg-gray-400' : 'bg-secondary'
+        }`}
       >
-        <Text className="text-center text-white font-bold">Sign In</Text>
+        {isSubmitting || isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-center text-white font-bold">Sign In</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push("sign-up")}>

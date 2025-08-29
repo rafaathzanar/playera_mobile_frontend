@@ -249,12 +249,12 @@ const ProfileScreen = () => {
         {
           icon: "heart-outline",
           label: "Favourite Venues",
-          action: () => navigation.navigate("FavouriteVenues"),
+          action: () => navigation.navigate("profile/favourites"),
         },
         {
           icon: "history",
           label: "Booking History",
-          action: () => navigation.navigate("BookingHistory"),
+          action: () => navigation.navigate("profile/booking-history"),
         },
         {
           icon: "web",
@@ -269,7 +269,7 @@ const ProfileScreen = () => {
         {
           icon: "lock",
           label: "Change Password",
-         action: () => navigation.navigate("change-password"), // Relative to profile tab
+         action: () => navigation.navigate("profile/change-password"), // Relative to profile tab
         },
         {
           icon: "delete",
