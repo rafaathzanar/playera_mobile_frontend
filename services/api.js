@@ -173,10 +173,10 @@ class ApiService {
   }
 
   // Equipment APIs
-  async getEquipment(venueId, filters = {}) {
+  async getEquipment(courtId, filters = {}) {
     const queryParams = new URLSearchParams(filters).toString();
-    const endpoint = venueId
-      ? `/equipment/venue/${venueId}?${queryParams}`
+    const endpoint = courtId
+      ? `/equipment/court/${courtId}?${queryParams}`
       : `/equipment?${queryParams}`;
     return await this.request(endpoint);
   }
@@ -346,7 +346,7 @@ class ApiService {
   async updateUserProfile(profileData) {
     return await this.request("/users/profile", {
       method: "PUT",
-      body: JSON.stringify(updateData),
+      body: JSON.stringify(profileData),
     });
   }
 

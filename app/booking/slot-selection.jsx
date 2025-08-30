@@ -46,7 +46,7 @@ export default function SlotSelection() {
         const venueData = await api.getVenueById(venueId);
         setVenue(venueData);
         
-        // Fetch available equipment for this venue
+        // Fetch available equipment for this court
         await fetchEquipment();
         
       } catch (error) {
@@ -66,7 +66,7 @@ export default function SlotSelection() {
   const fetchEquipment = async () => {
     try {
       setEquipmentLoading(true);
-      const equipmentData = await api.getEquipment(venueId);
+      const equipmentData = await api.getEquipment(courtId);
       setEquipment(equipmentData);
     } catch (error) {
       console.error("Error fetching equipment:", error);
@@ -113,24 +113,6 @@ export default function SlotSelection() {
         return prev.filter(s => s.id !== slot.id);
       } else {
         return [...prev, slot];
-      }
-    });
-  };
-
-  // Toggle equipment selection
-  const toggleEquipment = (equipmentItem) => {
-    setSelectedEquipment(prev => {
-      const current = prev[equipmentItem.id] || 0;
-      if (current > 0) {
-        const newState = { ...prev };
-        if (current === 1) {
-          delete newState[equipmentItem.id];
-        } else {
-          newState[equipmentItem.id] = current - 1;
-        }
-        return newState;
-      } else {
-        return { ...prev, [equipmentItem.id]: 1 };
       }
     });
   };
@@ -304,13 +286,15 @@ export default function SlotSelection() {
             <Text className="text-gray-600">Loading equipment...</Text>
           ) : equipment.length > 0 ? (
             <View className="space-y-3">
-              {equipment.map((equipmentItem) => {
-                const selectedQuantity = selectedEquipment[equipmentItem.id] || 0;
+              {equipment.map((equipmentItem, index) => {
+                // Ensure we have a unique key - use index as fallback if id is not unique
+                const uniqueKey = equipmentItem.id || `equipment-${index}`;
+                const selectedQuantity = selectedEquipment[uniqueKey] || 0;
                 const isAvailable = equipmentItem.availableQuantity > 0;
                 
                 return (
                   <View
-                    key={equipmentItem.id}
+                    key={uniqueKey}
                     className={`p-4 rounded-lg border-2 ${
                       selectedQuantity > 0
                         ? "border-orange-500 bg-orange-50"
@@ -320,22 +304,22 @@ export default function SlotSelection() {
                     <View className="flex-row justify-between items-center mb-2">
                       <View className="flex-1">
                         <Text className="text-lg font-semibold text-gray-800">
-                          {equipmentItem.name}
+                          {equipmentItem.name || 'Unnamed Equipment'}
                         </Text>
                         <Text className="text-gray-600 text-sm">
-                          {equipmentItem.description}
+                          {equipmentItem.description || 'No description available'}
                         </Text>
                         <Text className="text-gray-700 font-medium">
-                          LKR {equipmentItem.ratePerHour}/hour
+                          LKR {equipmentItem.ratePerHour || 0}/hour
                         </Text>
                         <Text className="text-gray-500 text-sm">
-                          Available: {equipmentItem.availableQuantity}
+                          Available: {equipmentItem.availableQuantity || 0}
                         </Text>
                       </View>
                       
                       <View className="flex-row items-center space-x-2">
                         <TouchableOpacity
-                          onPress={() => decreaseEquipmentQuantity(equipmentItem.id)}
+                          onPress={() => decreaseEquipmentQuantity(uniqueKey)}
                           disabled={selectedQuantity === 0}
                           className={`w-8 h-8 rounded-full justify-center items-center ${
                             selectedQuantity === 0
@@ -351,10 +335,10 @@ export default function SlotSelection() {
                         </Text>
                         
                         <TouchableOpacity
-                          onPress={() => increaseEquipmentQuantity(equipmentItem.id)}
-                          disabled={!isAvailable || selectedQuantity >= equipmentItem.availableQuantity}
+                          onPress={() => increaseEquipmentQuantity(uniqueKey)}
+                          disabled={!isAvailable || selectedQuantity >= (equipmentItem.availableQuantity || 0)}
                           className={`w-8 h-8 rounded-full justify-center items-center ${
-                            !isAvailable || selectedQuantity >= equipmentItem.availableQuantity
+                            !isAvailable || selectedQuantity >= (equipmentItem.availableQuantity || 0)
                               ? "bg-gray-200"
                               : "bg-orange-500"
                           }`}
@@ -368,7 +352,7 @@ export default function SlotSelection() {
               })}
             </View>
           ) : (
-            <Text className="text-gray-600">No equipment available for this venue</Text>
+            <Text className="text-gray-600">No equipment available for this court</Text>
           )}
         </View>
 

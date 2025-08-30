@@ -88,22 +88,30 @@ export default function HomeScreen() {
         const favoritesData = await api.getFavorites(user.userId);
         console.log('Raw favorites data:', favoritesData);
         
-        // Extract venue IDs from favorites
-        const venueIds = favoritesData.map(fav => fav.venueId);
-        console.log('Venue IDs from favorites:', venueIds);
+        // Extract venue IDs from favorites and remove duplicates
+        const uniqueVenueIds = [...new Set(favoritesData.map(fav => fav.venueId))];
+        console.log('Unique venue IDs from favorites:', uniqueVenueIds);
         
-        // Get full venue details for each favorite
+        // Get full venue details for each unique favorite
         const fullVenueDetails = [];
-        for (const venueId of venueIds) {
+        const seenVenueIds = new Set();
+        
+        for (const venueId of uniqueVenueIds) {
+          // Skip if we've already processed this venue ID
+          if (seenVenueIds.has(venueId)) continue;
+          
           try {
             const venueDetail = await api.getVenueById(venueId);
-            fullVenueDetails.push(venueDetail);
+            if (venueDetail && !seenVenueIds.has(venueDetail.venueId)) {
+              fullVenueDetails.push(venueDetail);
+              seenVenueIds.add(venueDetail.venueId);
+            }
           } catch (error) {
             console.error(`Error fetching venue ${venueId}:`, error);
           }
         }
         
-        console.log('Full venue details for favorites:', fullVenueDetails);
+        console.log('Full venue details for favorites (unique):', fullVenueDetails);
         setFavoriteVenues(fullVenueDetails);
       }
     } catch (error) {
@@ -123,9 +131,9 @@ export default function HomeScreen() {
       console.log('User ID:', user.userId);
       console.log('Venue ID:', venue.venueId);
 
-      // Use the backend's toggle endpoint
-      const result = await api.toggleFavorite(venue.venueId, user.userId);
-      console.log('Toggle result:', result);
+      // Use the toggle endpoint which handles both add and remove
+      console.log('Using toggle endpoint');
+      await api.toggleFavorite(venue.venueId, user.userId);
       
       // Refresh favorites list
       await loadFavorites();
@@ -182,19 +190,29 @@ export default function HomeScreen() {
     : filterVenues(venues);
 
   const categories = [
-    { name: "football", icon: "football", label: "Football", iconType: "ionicons" },
+    {
+      name: "football",
+      label: "Football",
+      icon: "football",
+      iconType: "ionicon",
+    },
     {
       name: "shuttle",
-      icon: require("../../assets/icons/shuttle.png"), // Adjust path as needed
       label: "Shuttle",
-      iconType: "image",
+      icon: "tennisball",
+      iconType: "ionicon",
     },
-    { name: "tennis", icon: "tennisball", label: "Tennis", iconType: "ionicons" },
+    {
+      name: "tennis",
+      label: "Tennis",
+      icon: "tennisball",
+      iconType: "ionicon",
+    },
     {
       name: "cricket",
-      icon: require("../../assets/icons/cricket.png"), // Adjust path as needed
-      label: "cricket",
-      iconType: "image",
+      label: "Cricket",
+      icon: "baseball",
+      iconType: "ionicon",
     },
   ];
 
