@@ -22,7 +22,7 @@ export default function SlotSelection() {
   const { user } = useAuth();
 
   // State
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // Set today as default
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [court, setCourt] = useState(null);
@@ -62,6 +62,13 @@ export default function SlotSelection() {
     }
   }, [courtId, venueId]);
 
+  // Fetch slots for the selected date when court is loaded
+  useEffect(() => {
+    if (court && selectedDate) {
+      fetchAvailableSlots(selectedDate);
+    }
+  }, [court, selectedDate]);
+
   // Fetch available equipment
   const fetchEquipment = async () => {
     try {
@@ -79,9 +86,12 @@ export default function SlotSelection() {
   // Fetch available slots for selected date using new API
   const fetchAvailableSlots = async (date) => {
     try {
-      if (!courtId || !date) return;
+      if (!courtId || !date) {
+        console.log('Missing required parameters:', { courtId, date });
+        return;
+      }
       
-      console.log('Fetching slots for court:', courtId, 'date:', date);
+      console.log('Fetching slots for court:', courtId, 'date:', date, 'date type:', typeof date);
       
       // Use the new dynamic time slot API
       const availableSlots = await api.getAvailableTimeSlots(courtId, date);
@@ -111,9 +121,30 @@ export default function SlotSelection() {
 
   // Handle date selection
   const handleDateSelect = (date) => {
-    setSelectedDate(date.dateString);
+    console.log('Date selected:', date);
+    console.log('Date object:', date);
+    console.log('Date string:', date.dateString);
+    
+    // Ensure we have a valid date string
+    let dateString = date.dateString;
+    
+    // Fallback: if dateString is not available, try to format the date object
+    if (!dateString && date.timestamp) {
+      const dateObj = new Date(date.timestamp);
+      dateString = dateObj.toISOString().split('T')[0];
+    }
+    
+    // Fallback: if still no dateString, use current date
+    if (!dateString) {
+      dateString = new Date().toISOString().split('T')[0];
+      console.log('Using fallback date:', dateString);
+    }
+    
+    console.log('Final date string to use:', dateString);
+    
+    setSelectedDate(dateString);
     setSelectedSlots([]); // Reset selected slots when date changes
-    fetchAvailableSlots(date.dateString);
+    fetchAvailableSlots(dateString);
   };
 
   // Toggle slot selection
@@ -251,6 +282,10 @@ export default function SlotSelection() {
               todayTextColor: '#FF4B00',
               arrowColor: '#FF4B00',
             }}
+            // Ensure we get proper date format
+            dateFormat="yyyy-MM-dd"
+            // Set initial date
+            current={selectedDate}
           />
         </View>
 
@@ -258,39 +293,45 @@ export default function SlotSelection() {
         {selectedDate && (
           <View className="p-4">
             <Text className="text-lg font-semibold mb-3">Available Time Slots</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {availableSlots.map((slot) => {
-                const isSelected = selectedSlots.find(s => s.id === slot.id);
-                return (
-                  <TouchableOpacity
-                    key={slot.id}
-                    onPress={() => toggleSlot(slot)}
-                    disabled={!slot.available}
-                    className={`px-4 py-3 rounded-lg border-2 ${
-                      isSelected
-                        ? "bg-orange-500 border-orange-500"
-                        : slot.available
-                        ? "bg-white border-gray-300"
-                        : "bg-gray-200 border-gray-200"
-                    }`}
-                  >
-                    <Text
-                      className={`font-medium ${
+            {availableSlots.length > 0 ? (
+              <View className="flex-row flex-wrap gap-2">
+                {availableSlots.map((slot) => {
+                  const isSelected = selectedSlots.find(s => s.id === slot.id);
+                  return (
+                    <TouchableOpacity
+                      key={slot.id}
+                      onPress={() => toggleSlot(slot)}
+                      disabled={!slot.available}
+                      className={`px-4 py-3 rounded-lg border-2 ${
                         isSelected
-                          ? "text-white"
+                          ? "bg-orange-500 border-orange-500"
                           : slot.available
-                          ? "text-gray-800"
-                          : "text-gray-500"
+                          ? "bg-white border-gray-300"
+                          : "bg-gray-200 border-gray-200"
                       }`}
                     >
-                      {slot.time}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <Text
+                        className={`font-medium ${
+                          isSelected
+                            ? "text-white"
+                            : slot.available
+                            ? "text-gray-800"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {slot.time}
+                      </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text className="text-gray-600 text-center py-4">
+                  No time slots available for {selectedDate}. Please select a different date.
+                </Text>
+              )}
             </View>
-          </View>
-        )}
+          )}
 
         {/* Equipment Selection */}
         <View className="p-4">

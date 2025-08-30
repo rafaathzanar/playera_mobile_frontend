@@ -256,24 +256,91 @@ class ApiService {
 
   // Time Slot APIs (New Dynamic System)
   async getAvailableTimeSlots(courtId, date) {
-    const formattedDate = date.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+    let formattedDate;
+
+    // Handle both Date objects and date strings
+    if (date instanceof Date) {
+      formattedDate = date.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+    } else if (typeof date === "string") {
+      // If it's already a string in YYYY-MM-DD format, use it directly
+      formattedDate = date;
+    } else {
+      throw new Error(
+        "Invalid date format. Expected Date object or string in YYYY-MM-DD format."
+      );
+    }
+
     return await this.request(
       `/timeslots/court/${courtId}/date/${formattedDate}`
     );
   }
 
   async getTimeSlotsForDateRange(courtId, startDate, endDate) {
-    const start = startDate.toISOString().split("T")[0];
-    const end = endDate.toISOString().split("T")[0];
+    let start, end;
+
+    // Handle both Date objects and date strings
+    if (startDate instanceof Date) {
+      start = startDate.toISOString().split("T")[0];
+    } else if (typeof startDate === "string") {
+      start = startDate;
+    } else {
+      throw new Error(
+        "Invalid startDate format. Expected Date object or string in YYYY-MM-DD format."
+      );
+    }
+
+    if (endDate instanceof Date) {
+      end = endDate.toISOString().split("T")[0];
+    } else if (typeof endDate === "string") {
+      end = endDate;
+    } else {
+      throw new Error(
+        "Invalid endDate format. Expected Date object or string in YYYY-MM-DD format."
+      );
+    }
+
     return await this.request(
       `/timeslots/court/${courtId}/range?startDate=${start}&endDate=${end}`
     );
   }
 
   async checkTimeSlotAvailability(courtId, date, startTime, endTime) {
-    const formattedDate = date.toISOString().split("T")[0];
-    const start = startTime.toTimeString().split(" ")[0];
-    const end = endTime.toTimeString().split(" ")[0];
+    let formattedDate;
+
+    // Handle both Date objects and date strings
+    if (date instanceof Date) {
+      formattedDate = date.toISOString().split("T")[0];
+    } else if (typeof date === "string") {
+      formattedDate = date;
+    } else {
+      throw new Error(
+        "Invalid date format. Expected Date object or string in YYYY-MM-DD format."
+      );
+    }
+
+    let start, end;
+
+    // Handle both Time objects and time strings
+    if (startTime instanceof Date) {
+      start = startTime.toTimeString().split(" ")[0];
+    } else if (typeof startTime === "string") {
+      start = startTime;
+    } else {
+      throw new Error(
+        "Invalid startTime format. Expected Date object or string in HH:MM:SS format."
+      );
+    }
+
+    if (endTime instanceof Date) {
+      end = endTime.toTimeString().split(" ")[0];
+    } else if (typeof endTime === "string") {
+      end = endTime;
+    } else {
+      throw new Error(
+        "Invalid endTime format. Expected Date object or string in HH:MM:SS format."
+      );
+    }
+
     return await this.request(
       `/timeslots/court/${courtId}/availability?date=${formattedDate}&startTime=${start}&endTime=${end}`
     );
