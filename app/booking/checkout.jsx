@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from '../../contexts/AuthContext';
-import api from '../../services/api';
+import api from "../../services/api";
 
 export default function Checkout({ onClose, bookingData }) {
   const router = useRouter();
-  const { user } = useAuth();
 
   // Form fields
   const [cardHolderName, setCardHolderName] = useState("");
@@ -14,7 +12,8 @@ export default function Checkout({ onClose, bookingData }) {
   const [expiryDate, setExpiryDate] = useState("");
   const [cvv, setCvv] = useState("");
   const [saveCard, setSaveCard] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [specialRequests, setSpecialRequests] = useState("");
 
   // Validation
   const validateForm = () => {
@@ -37,63 +36,64 @@ export default function Checkout({ onClose, bookingData }) {
     return true;
   };
 
-  const handlePay = async () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
-    if (!user) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
 
     try {
-      setProcessing(true);
+      setLoading(true);
 
-      // Create the booking request
+      // Create the booking request in the format expected by the backend
       const bookingRequest = {
-        customerId: user.userId,
+        customerId: bookingData.customerId,
         bookingDate: bookingData.bookingDate,
         startTime: bookingData.startTime,
         endTime: bookingData.endTime,
         duration: bookingData.duration,
+        specialRequests: specialRequests,
+        // Transform to the expected backend format
         courtBookings: [{
           courtId: bookingData.courtId,
           timeDuration: bookingData.duration
         }],
-        equipmentBookings: [] // Can be extended later
+        equipmentBookings: (bookingData.selectedEquipment || []).map(equipment => ({
+          equipmentId: equipment.id,
+          quantity: equipment.quantity,
+          timeDuration: bookingData.duration
+        }))
       };
 
+      console.log('Creating booking with data:', bookingRequest);
+
       // Create the booking
-      const booking = await api.createBooking(bookingRequest);
-      
-      if (booking) {
+      const createdBooking = await api.createBooking(bookingRequest);
+      console.log('Booking created:', createdBooking);
+
+      if (createdBooking && createdBooking.bookingId) {
         // Create payment record
         const paymentData = {
-          bookingId: booking.bookingId,
-          amount: bookingData.totalCost,
-          currency: 'LKR',
+          bookingId: createdBooking.bookingId,
+          amount: parseFloat(bookingData.totalCost),
           paymentMethod: 'CREDIT_CARD',
-          status: 'COMPLETED',
-          transactionId: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          status: 'PENDING',
+          transactionId: `TXN_${Date.now()}`,
           paymentDate: new Date().toISOString()
         };
 
-        try {
-          await api.createPayment(paymentData);
-        } catch (paymentError) {
-          console.error('Payment creation failed:', paymentError);
-          // Payment creation failed, but booking was created
-          // In a real app, you might want to handle this differently
-        }
+        console.log('Creating payment with data:', paymentData);
+        const createdPayment = await api.createPayment(paymentData);
+        console.log('Payment created:', createdPayment);
 
         // Show success message
         Alert.alert(
-          'Booking Confirmed!',
-          `Your booking has been successfully created.\n\nBooking ID: ${booking.bookingId}\nTotal Amount: LKR ${bookingData.totalCost.toFixed(2)}`,
+          'Booking Successful!',
+          'Your court booking has been confirmed. You will receive a confirmation email shortly.',
           [
             {
               text: 'View Bookings',
               onPress: () => {
                 onClose();
-                router.push('/profile'); // Navigate to profile/bookings
+                // Navigate to bookings list or profile
+                // You can implement navigation logic here
               }
             },
             {
@@ -102,16 +102,18 @@ export default function Checkout({ onClose, bookingData }) {
             }
           ]
         );
+      } else {
+        throw new Error('Failed to create booking - no booking ID returned');
       }
+
     } catch (error) {
-      console.error('Booking creation failed:', error);
+      console.error('Error creating booking:', error);
       Alert.alert(
         'Booking Failed',
-        error.message || 'Failed to create booking. Please try again.',
-        [{ text: 'OK' }]
+        error.message || 'An error occurred while creating your booking. Please try again.'
       );
     } finally {
-      setProcessing(false);
+      setLoading(false);
     }
   };
 
@@ -243,6 +245,20 @@ export default function Checkout({ onClose, bookingData }) {
             </View>
           </View>
 
+          {/* Special Requests */}
+          <View className="mb-4 mt-4">
+            <Text className="text-black mb-2">SPECIAL REQUESTS (Optional)</Text>
+            <TextInput
+              value={specialRequests}
+              onChangeText={setSpecialRequests}
+              className="border border-gray-300 p-3 rounded-lg"
+              placeholder="Any special requests or notes..."
+              placeholderTextColor="gray"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
           <TouchableOpacity
             onPress={() => setSaveCard(!saveCard)}
             className="flex-row items-center mt-4"
@@ -262,14 +278,14 @@ export default function Checkout({ onClose, bookingData }) {
 
           {/* Pay Button */}
           <TouchableOpacity
-            onPress={handlePay}
-            disabled={processing}
+            onPress={handleSubmit}
+            disabled={loading}
             className={`mt-14 p-3 rounded-lg ${
-              processing ? 'bg-gray-400' : 'bg-orange-500'
+              loading ? 'bg-gray-400' : 'bg-orange-500'
             }`}
           >
             <Text className="text-white text-center text-lg font-bold">
-              {processing ? 'Processing...' : 'Pay →'}
+              {loading ? 'Processing...' : 'Pay →'}
             </Text>
           </TouchableOpacity>
 

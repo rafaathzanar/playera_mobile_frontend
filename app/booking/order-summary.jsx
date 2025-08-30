@@ -11,7 +11,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 export default function OrderSummary() {
-  const { venueId, courtId, slots, totalDuration, totalCost, courtName, venueName } = useLocalSearchParams();
+  const { 
+    venueId, 
+    courtId, 
+    selectedDate, 
+    startTime, 
+    endTime, 
+    totalDuration, 
+    totalCost, 
+    courtName, 
+    venueName,
+    selectedSlots: selectedSlotsParam,
+    selectedEquipment: selectedEquipmentParam
+  } = useLocalSearchParams();
+  
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
@@ -21,18 +34,31 @@ export default function OrderSummary() {
   const [venue, setVenue] = useState(null);
   const [court, setCourt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [selectedEquipment, setSelectedEquipment] = useState([]);
 
-  // Parse slots from query parameter with error handling
-  let selectedSlots = [];
-  try {
-    selectedSlots = slots ? JSON.parse(decodeURIComponent(slots)) : [];
-    if (!Array.isArray(selectedSlots)) {
-      selectedSlots = [];
+  // Parse selected slots and equipment from params
+  useEffect(() => {
+    if (selectedSlotsParam) {
+      try {
+        const parsedSlots = JSON.parse(selectedSlotsParam);
+        setSelectedSlots(parsedSlots);
+        console.log('Parsed selected slots:', parsedSlots);
+      } catch (error) {
+        console.error('Error parsing selected slots:', error);
+      }
     }
-  } catch (error) {
-    console.error("Error parsing slots:", error);
-    selectedSlots = [];
-  }
+
+    if (selectedEquipmentParam) {
+      try {
+        const parsedEquipment = JSON.parse(selectedEquipmentParam);
+        setSelectedEquipment(parsedEquipment);
+        console.log('Parsed selected equipment:', parsedEquipment);
+      } catch (error) {
+        console.error('Error parsing selected equipment:', error);
+      }
+    }
+  }, [selectedSlotsParam, selectedEquipmentParam]);
 
   // Fetch venue and court details
   useEffect(() => {
@@ -62,18 +88,26 @@ export default function OrderSummary() {
     fetchDetails();
   }, [venueId, courtId]);
 
-  // Calculate costs
+  // Calculate costs based on selected slots and equipment
   const calculateCosts = () => {
-    if (!court) return { courtCost: 0, totalCost: 0 };
-    
-    const courtCost = court.pricePerHour * totalDuration;
-    const equipmentCost = 0; // Will be added when equipment selection is implemented
-    const totalCost = courtCost + equipmentCost;
-    
-    return { courtCost, totalCost };
+    if (!court || selectedSlots.length === 0) return { courtCost: 0, equipmentCost: 0, totalCost: 0 };
+
+    // Calculate court cost based on duration
+    const calculatedDuration = selectedSlots.length * 0.5; // 30 minutes per slot
+    const courtCost = court.pricePerHour * calculatedDuration;
+
+    // Calculate equipment cost
+    let equipmentCost = 0;
+    selectedEquipment.forEach(item => {
+      equipmentCost += item.totalCost || 0;
+    });
+
+    const calculatedTotalCost = courtCost + equipmentCost;
+
+    return { courtCost, equipmentCost, totalCost: calculatedTotalCost, totalDuration: calculatedDuration };
   };
 
-  const { courtCost, totalCost: calculatedTotalCost } = calculateCosts();
+  const { courtCost, equipmentCost, totalCost: calculatedTotalCost, totalDuration: calculatedDuration } = calculateCosts();
 
   const handleProceed = () => {
     if (!user) {
@@ -111,19 +145,17 @@ export default function OrderSummary() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-4">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView>
-        {/* Header Section */}
-        <View>
-          <View className="flex-row items-center p-2" style={{ backgroundColor: '#FF4B00' }}>
-            <TouchableOpacity onPress={() => navigation.goBack()} className="pr-1">
-              <ArrowLeftIcon size={20} color="white" style={{ marginLeft: 15 }} />
-            </TouchableOpacity>
-            <Text className="font-bold text-lg text-white text-center flex-1">
-              BOOKING DETAILS
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
+        {/* Header */}
+        <View className="flex-row items-center p-2" style={{ backgroundColor: '#FF4B00' }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} className="pr-1">
+            <ArrowLeftIcon size={20} color="white" style={{ marginLeft: 15 }} />
+          </TouchableOpacity>
+          <Text className="font-bold text-lg text-white text-center flex-1">
+            BOOKING DETAILS
+          </Text>
+          <View style={{ width: 24 }} />
         </View>
 
         {/* Venue Image */}
@@ -156,7 +188,7 @@ export default function OrderSummary() {
           <View className="mt-4">
             <Text className="text-lg font-bold text-gray-800">Selected Date & Time</Text>
             <Text className="text-gray-600 mt-1">
-              {new Date().toLocaleDateString()} • {totalDuration} hours
+              {selectedDate || new Date().toLocaleDateString()} • {calculatedDuration} hours
             </Text>
           </View>
 
@@ -173,19 +205,35 @@ export default function OrderSummary() {
             )}
           </View>
 
+          {/* Equipment Summary */}
+          {selectedEquipment.length > 0 && (
+            <View className="mt-4">
+              <Text className="text-lg font-bold text-gray-800">Selected Equipment</Text>
+              {selectedEquipment.map((item, index) => (
+                <View key={index} className="ml-4 mt-1">
+                  <Text className="text-gray-600">
+                    • {item.name} x{item.quantity} - LKR {item.totalCost.toFixed(2)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Cost Breakdown */}
           <View className="mt-6 bg-gray-50 p-4 rounded-lg">
             <Text className="text-lg font-bold text-gray-800 mb-3">Cost Breakdown</Text>
             
             <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-gray-600">Court Rental ({totalDuration} hours)</Text>
+              <Text className="text-gray-600">Court Rental ({calculatedDuration} hours)</Text>
               <Text className="text-gray-800">LKR {courtCost.toFixed(2)}</Text>
             </View>
             
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-gray-600">Equipment Rental</Text>
-              <Text className="text-gray-800">LKR 0.00</Text>
-            </View>
+            {equipmentCost > 0 && (
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-gray-600">Equipment Rental</Text>
+                <Text className="text-gray-800">LKR {equipmentCost.toFixed(2)}</Text>
+              </View>
+            )}
             
             <View className="border-t border-gray-300 pt-2 mt-2">
               <View className="flex-row justify-between items-center">
@@ -201,7 +249,7 @@ export default function OrderSummary() {
           <View className="mt-4 bg-blue-50 p-4 rounded-lg">
             <Text className="text-sm text-blue-800">
               💡 Booking includes court access for the selected time slots. 
-              Equipment can be added during checkout if needed.
+              {selectedEquipment.length > 0 ? ' Equipment has been added to your booking.' : ' Equipment can be added during checkout if needed.'}
             </Text>
           </View>
         </View>
@@ -217,12 +265,13 @@ export default function OrderSummary() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal for Checkout */}
+      {/* Checkout Modal */}
       <Modal
         isVisible={isModalVisible}
         onBackdropPress={handleModalClose}
-        onBackButtonPress={handleModalClose}
-        style={{ justifyContent: "flex-end", margin: 0 }}
+        onSwipeComplete={handleModalClose}
+        swipeDirection="down"
+        style={{ margin: 0, justifyContent: 'flex-end' }}
       >
         <View className="bg-white rounded-t-[20px] p-4 h-3/4">
           <Checkout 
@@ -231,12 +280,13 @@ export default function OrderSummary() {
               venueId: parseInt(venueId),
               courtId: parseInt(courtId),
               customerId: user?.userId,
-              bookingDate: new Date().toISOString().split('T')[0],
-              startTime: selectedSlots[0]?.startTime,
-              endTime: selectedSlots[selectedSlots.length - 1]?.endTime,
-              duration: totalDuration,
-              totalCost: calculatedTotalCost,
+              bookingDate: selectedDate || new Date().toISOString().split('T')[0],
+              startTime: selectedSlots[0]?.startTime || startTime,
+              endTime: selectedSlots[selectedSlots.length - 1]?.endTime || endTime,
+              duration: calculatedDuration || parseFloat(totalDuration),
+              totalCost: calculatedTotalCost || parseFloat(totalCost),
               selectedSlots: selectedSlots,
+              selectedEquipment: selectedEquipment,
               court: court,
               venue: venue
             }}

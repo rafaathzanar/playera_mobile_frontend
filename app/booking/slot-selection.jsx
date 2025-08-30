@@ -76,23 +76,36 @@ export default function SlotSelection() {
     }
   };
 
-  // Fetch available slots for selected date
+  // Fetch available slots for selected date using new API
   const fetchAvailableSlots = async (date) => {
     try {
       if (!courtId || !date) return;
-      const slots = await api.getAvailableSlots(courtId, date);
-      const formattedSlots = slots.map(slot => ({
-        id: slot.id,
-        time: `${slot.startTime} - ${slot.endTime}`,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        available: slot.status === 'AVAILABLE',
-        slot: slot
-      }));
-      setAvailableSlots(formattedSlots);
+      
+      console.log('Fetching slots for court:', courtId, 'date:', date);
+      
+      // Use the new dynamic time slot API
+      const availableSlots = await api.getAvailableTimeSlots(courtId, date);
+      console.log('Available slots from API:', availableSlots);
+      
+      if (availableSlots && Array.isArray(availableSlots)) {
+        // Transform the new API response to match existing format
+        const formattedSlots = availableSlots.map(slot => ({
+          id: `${slot.courtId}-${slot.date}-${slot.startTime}`,
+          time: `${slot.startTime} - ${slot.endTime}`,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          available: slot.available,
+          slot: slot
+        }));
+        setAvailableSlots(formattedSlots);
+      } else {
+        setAvailableSlots([]);
+        console.log('No slots available or invalid response');
+      }
     } catch (error) {
       console.error('Error fetching available slots:', error);
       Alert.alert('Error', 'Failed to load available slots');
+      setAvailableSlots([]);
     }
   };
 

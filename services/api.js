@@ -228,7 +228,7 @@ class ApiService {
     });
   }
 
-  // Slot APIs
+  // Slot APIs (Legacy - keeping for backward compatibility)
   async getAvailableSlots(courtId, date) {
     return await this.request(`/slots/available/${courtId}/date/${date}`);
   }
@@ -252,6 +252,35 @@ class ApiService {
       endDate: endDate,
     }).toString();
     return await this.request(`/slots/calendar/${courtId}?${params}`);
+  }
+
+  // Time Slot APIs (New Dynamic System)
+  async getAvailableTimeSlots(courtId, date) {
+    const formattedDate = date.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+    return await this.request(
+      `/timeslots/court/${courtId}/date/${formattedDate}`
+    );
+  }
+
+  async getTimeSlotsForDateRange(courtId, startDate, endDate) {
+    const start = startDate.toISOString().split("T")[0];
+    const end = endDate.toISOString().split("T")[0];
+    return await this.request(
+      `/timeslots/court/${courtId}/range?startDate=${start}&endDate=${end}`
+    );
+  }
+
+  async checkTimeSlotAvailability(courtId, date, startTime, endTime) {
+    const formattedDate = date.toISOString().split("T")[0];
+    const start = startTime.toTimeString().split(" ")[0];
+    const end = endTime.toTimeString().split(" ")[0];
+    return await this.request(
+      `/timeslots/court/${courtId}/availability?date=${formattedDate}&startTime=${start}&endTime=${end}`
+    );
+  }
+
+  async getPeakHours(courtId) {
+    return await this.request(`/timeslots/court/${courtId}/peak-hours`);
   }
 
   // Payment APIs
