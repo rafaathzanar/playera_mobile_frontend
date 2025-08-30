@@ -189,7 +189,7 @@ export default function SlotSelection() {
     
     let equipmentCost = 0;
     Object.entries(selectedEquipment).forEach(([equipmentId, quantity]) => {
-      const equipmentItem = equipment.find(e => e.id == equipmentId);
+      const equipmentItem = equipment.find(e => e.equipmentId == equipmentId);
       if (equipmentItem) {
         equipmentCost += equipmentItem.ratePerHour * quantity * totalDuration;
       }
@@ -211,15 +211,19 @@ export default function SlotSelection() {
     
     // Prepare equipment data for next page
     const selectedEquipmentData = Object.entries(selectedEquipment).map(([equipmentId, quantity]) => {
-      const equipmentItem = equipment.find(e => e.id == equipmentId);
+      const equipmentItem = equipment.find(e => e.equipmentId == equipmentId);
+      if (!equipmentItem) {
+        console.error('Equipment not found for ID:', equipmentId);
+        return null;
+      }
       return {
-        id: equipmentItem.id,
+        id: equipmentItem.equipmentId,
         name: equipmentItem.name,
         quantity: quantity,
         ratePerHour: equipmentItem.ratePerHour,
         totalCost: equipmentItem.ratePerHour * quantity * totalDuration
       };
-    });
+    }).filter(item => item !== null); // Remove any null items
 
     router.push({
       pathname: "/booking/order-summary",
@@ -340,11 +344,11 @@ export default function SlotSelection() {
             <Text className="text-gray-600">Loading equipment...</Text>
           ) : equipment.length > 0 ? (
             <View className="space-y-3">
-              {equipment.map((equipmentItem, index) => {
-                // Ensure we have a unique key - use index as fallback if id is not unique
-                const uniqueKey = equipmentItem.id || `equipment-${index}`;
-                const selectedQuantity = selectedEquipment[uniqueKey] || 0;
-                const isAvailable = equipmentItem.availableQuantity > 0;
+                             {equipment.map((equipmentItem, index) => {
+                 // Use equipmentId from the database, not id
+                 const uniqueKey = equipmentItem.equipmentId || `equipment-${index}`;
+                 const selectedQuantity = selectedEquipment[uniqueKey] || 0;
+                 const isAvailable = equipmentItem.availableQuantity > 0;
                 
                 return (
                   <View
