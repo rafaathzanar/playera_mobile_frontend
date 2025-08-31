@@ -1,274 +1,342 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarIcon, ClockIcon, MapPinIcon, StarIcon } from 'react-native-heroicons/outline';
-import api from '../../services/api';
+import React, { useState, useEffect } from "react";
+import {
+  SafeAreaView,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { ArrowLeftIcon, CalendarIcon, ClockIcon, MapPinIcon, CurrencyDollarIcon } from "react-native-heroicons/outline";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../contexts/AuthContext";
+import api from "../../services/api";
+import websocketService from "../../services/websocket";
 
 export default function BookingHistory() {
+  const router = useRouter();
+  const navigation = useNavigation();
+  const { user } = useAuth();
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'past'
 
   useEffect(() => {
-    loadBookings();
-  }, []);
+    if (user) {
+      fetchBookings();
+    }
+  }, [user]);
 
-  const loadBookings = async () => {
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (user?.userId) {
+      // Connect to WebSocket for real-time updates
+      websocketService.connect(user.userId, handleWebSocketMessage)
+        .then(() => {
+          console.log('WebSocket connected for customer:', user.userId);
+        })
+        .catch(error => {
+          console.error('Failed to connect WebSocket:', error);
+        });
+
+      // Cleanup on unmount
+      return () => {
+        websocketService.disconnect();
+      };
+    }
+  }, [user?.userId]);
+
+  const fetchBookings = async () => {
     try {
       setLoading(true);
-      const response = await api.getBookings();
-      setBookings(response);
+      const response = await api.getBookings({ customerId: user.userId });
+      setBookings(response || []);
     } catch (error) {
-      console.error('Error loading bookings:', error);
+      console.error('Error fetching bookings:', error);
       Alert.alert('Error', 'Failed to load booking history');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toUpperCase()) {
-      case 'CONFIRMED':
-        return '#28A745';
-      case 'PENDING':
-        return '#FFC107';
-      case 'CANCELLED':
-        return '#DC3545';
-      case 'COMPLETED':
-        return '#17A2B8';
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchBookings();
+    setRefreshing(false);
+  };
+
+  // Handle WebSocket messages for real-time updates
+  const handleWebSocketMessage = (type, data) => {
+    switch (type) {
+      case 'BOOKING_UPDATE':
+        // Update booking status in real-time
+        setBookings(prev => prev.map(booking => 
+          booking.bookingId === data.bookingId 
+            ? { ...booking, status: data.status }
+            : booking
+        ));
+        break;
+      
       default:
-        return '#6C757D';
+        console.log('Unknown WebSocket message type:', type);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'CONFIRMED':
+        return 'bg-green-100 text-green-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'CANCELLED':
+        return 'bg-red-100 text-red-800';
+      case 'COMPLETED':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status) => {
-    return status?.toUpperCase() || 'UNKNOWN';
+    switch (status) {
+      case 'CONFIRMED':
+        return 'Confirmed';
+      case 'PENDING':
+        return 'Pending';
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'COMPLETED':
+        return 'Completed';
+      default:
+        return status;
+    }
   };
 
-  const renderBookingItem = ({ item }) => (
-    <View style={styles.bookingCard}>
-      <View style={styles.bookingHeader}>
-        <Text style={styles.venueName}>{item.venue?.name || 'Unknown Venue'}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
-      <View style={styles.bookingDetails}>
-        <View style={styles.detailRow}>
-          <CalendarIcon size={16} color="#666" />
-          <Text style={styles.detailText}>
-            {new Date(item.bookingDate).toLocaleDateString()}
-          </Text>
-        </View>
+  const formatTime = (timeString) => {
+    return timeString;
+  };
 
-        <View style={styles.detailRow}>
-          <ClockIcon size={16} color="#666" />
-          <Text style={styles.detailText}>
-            {item.duration} hour{item.duration > 1 ? 's' : ''}
-          </Text>
-        </View>
+  const isUpcoming = (booking) => {
+    const bookingDate = new Date(booking.bookingDate);
+    const now = new Date();
+    return bookingDate >= now;
+  };
 
-        <View style={styles.detailRow}>
-          <MapPinIcon size={16} color="#666" />
-          <Text style={styles.detailText}>
-            {item.venue?.address || 'Address not available'}
-          </Text>
-        </View>
+  const filteredBookings = bookings.filter(booking => {
+    if (activeTab === 'upcoming') {
+      return isUpcoming(booking);
+    } else {
+      return !isUpcoming(booking);
+    }
+  });
 
-        {item.court && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailText}>
-              Court: {item.court.type} ({item.court.surfaceType})
-            </Text>
-          </View>
-        )}
+  const handleCancelBooking = async (bookingId) => {
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this booking? This action cannot be undone.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.cancelBooking(bookingId);
+              Alert.alert('Success', 'Booking cancelled successfully');
+              fetchBookings(); // Refresh the list
+            } catch (error) {
+              console.error('Error cancelling booking:', error);
+              Alert.alert('Error', 'Failed to cancel booking');
+            }
+          }
+        }
+      ]
+    );
+  };
 
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Total Cost:</Text>
-          <Text style={styles.priceValue}>${item.totalCost}</Text>
-        </View>
-      </View>
-
-      {item.status === 'COMPLETED' && !item.reviewed && (
-        <TouchableOpacity style={styles.reviewButton}>
-          <StarIcon size={16} color="#FFF" />
-          <Text style={styles.reviewButtonText}>Write Review</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const handleViewVenue = (venueId) => {
+    router.push(`/venue/${venueId}`);
+  };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading booking history...</Text>
-        </View>
+      <SafeAreaView className="flex-1 justify-center items-center">
+        <Text className="text-xl text-gray-600">Loading bookings...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Booking History</Text>
-        <Text style={styles.subtitle}>{bookings.length} bookings</Text>
+    <SafeAreaView className="flex-1 bg-white">
+      {/* Header */}
+      <View className="flex-row items-center p-4 bg-orange-500">
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <ArrowLeftIcon size={24} color="white" />
+        </TouchableOpacity>
+        <Text className="text-xl font-bold text-white ml-4">My Bookings</Text>
       </View>
 
-      {bookings.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <CalendarIcon size={64} color="#CCC" />
-          <Text style={styles.emptyTitle}>No bookings yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Start booking venues to see your history here
+      {/* Tab Navigation */}
+      <View className="flex-row bg-gray-100 p-1 mx-4 mt-4 rounded-lg">
+        <TouchableOpacity
+          onPress={() => setActiveTab('upcoming')}
+          className={`flex-1 py-2 px-4 rounded-md ${
+            activeTab === 'upcoming' ? 'bg-white shadow-sm' : ''
+          }`}
+        >
+          <Text className={`text-center font-medium ${
+            activeTab === 'upcoming' ? 'text-orange-600' : 'text-gray-600'
+          }`}>
+            Upcoming
           </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={bookings}
-          renderItem={renderBookingItem}
-          keyExtractor={(item) => item.bookingId.toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('past')}
+          className={`flex-1 py-2 px-4 rounded-md ${
+            activeTab === 'past' ? 'bg-white shadow-sm' : ''
+          }`}
+        >
+          <Text className={`text-center font-medium ${
+            activeTab === 'past' ? 'text-orange-600' : 'text-gray-600'
+          }`}>
+            Past
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Bookings List */}
+      <ScrollView
+        className="flex-1 px-4"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {filteredBookings.length === 0 ? (
+          <View className="flex-1 justify-center items-center py-20">
+            <CalendarIcon size={48} color="#9CA3AF" />
+            <Text className="text-lg font-medium text-gray-500 mt-4">
+              No {activeTab} bookings
+            </Text>
+            <Text className="text-gray-400 text-center mt-2">
+              {activeTab === 'upcoming' 
+                ? 'You don\'t have any upcoming bookings'
+                : 'You don\'t have any past bookings'
+              }
+            </Text>
+          </View>
+        ) : (
+          <View className="py-4 space-y-4">
+            {filteredBookings.map((booking) => (
+              <View key={booking.bookingId} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                {/* Booking Header */}
+                <View className="flex-row justify-between items-start mb-3">
+                  <View className="flex-1">
+                    <Text className="text-lg font-semibold text-gray-800">
+                      {booking.venueName}
+                    </Text>
+                    <Text className="text-gray-600">{booking.courtName}</Text>
+                  </View>
+                  <View className={`px-2 py-1 rounded-full ${getStatusColor(booking.status)}`}>
+                    <Text className="text-xs font-medium">
+                      {getStatusText(booking.status)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Booking Details */}
+                <View className="space-y-2 mb-4">
+                  <View className="flex-row items-center">
+                    <CalendarIcon size={16} color="#6B7280" />
+                    <Text className="text-gray-600 ml-2">
+                      {formatDate(booking.bookingDate)}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <ClockIcon size={16} color="#6B7280" />
+                    <Text className="text-gray-600 ml-2">
+                      {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <MapPinIcon size={16} color="#6B7280" />
+                    <Text className="text-gray-600 ml-2">
+                      Duration: {booking.duration} hours
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <CurrencyDollarIcon size={16} color="#6B7280" />
+                    <Text className="text-gray-600 ml-2">
+                      Total: LKR {booking.totalCost?.toFixed(2) || '0.00'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Equipment Summary */}
+                {booking.equipmentBookings && booking.equipmentBookings.length > 0 && (
+                  <View className="bg-gray-50 p-3 rounded-lg mb-4">
+                    <Text className="text-sm font-medium text-gray-700 mb-2">Equipment:</Text>
+                    {booking.equipmentBookings.map((equipment, index) => (
+                      <Text key={index} className="text-sm text-gray-600">
+                        • {equipment.equipmentName} x{equipment.quantity}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {/* Special Requests */}
+                {booking.specialRequests && (
+                  <View className="bg-blue-50 p-3 rounded-lg mb-4">
+                    <Text className="text-sm font-medium text-blue-700 mb-1">Special Requests:</Text>
+                    <Text className="text-sm text-blue-600">{booking.specialRequests}</Text>
+                  </View>
+                )}
+
+                {/* Action Buttons */}
+                <View className="flex-row space-x-2">
+                  <TouchableOpacity
+                    onPress={() => handleViewVenue(booking.venueId)}
+                    className="flex-1 bg-blue-600 py-2 px-4 rounded-lg"
+                  >
+                    <Text className="text-white text-center font-medium">View Venue</Text>
+                  </TouchableOpacity>
+                  
+                  {activeTab === 'upcoming' && booking.status === 'PENDING' && (
+                    <TouchableOpacity
+                      onPress={() => handleCancelBooking(booking.bookingId)}
+                      className="flex-1 bg-red-600 py-2 px-4 rounded-lg"
+                    >
+                      <Text className="text-white text-center font-medium">Cancel</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Booking ID */}
+                <View className="mt-3 pt-3 border-t border-gray-200">
+                  <Text className="text-xs text-gray-500 text-center">
+                    Booking ID: #{booking.bookingId}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  listContainer: {
-    padding: 20,
-  },
-  bookingCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  bookingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  venueName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  bookingDetails: {
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    flex: 1,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-  },
-  priceLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  priceValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  reviewButton: {
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  reviewButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
-});
 
 

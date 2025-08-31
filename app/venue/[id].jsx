@@ -114,6 +114,7 @@ export default function VenueDetail() {
     return priceText;
   };
 
+
   // Get venue image
   const getVenueImage = (venue) => {
     if (venue.imageUrl) return venue.imageUrl;

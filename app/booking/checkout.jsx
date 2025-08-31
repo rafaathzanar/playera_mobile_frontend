@@ -1,301 +1,365 @@
-import React, { useState } from "react";
-import { SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View, Image, Alert } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useState, useEffect } from "react";
+import { 
+  SafeAreaView, 
+  ScrollView, 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  Image
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeftIcon, CheckCircleIcon } from "react-native-heroicons/solid";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 
-export default function Checkout({ onClose, bookingData }) {
+export default function Checkout() {
+  const params = useLocalSearchParams();
   const router = useRouter();
+  const navigation = useNavigation();
+  const { user } = useAuth();
 
-  // Form fields
-  const [cardHolderName, setCardHolderName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [saveCard, setSaveCard] = useState(false);
+  // Parse the data from params
+  const [bookingData, setBookingData] = useState({
+    venueId: params.venueId,
+    courtId: params.courtId,
+    selectedDate: params.selectedDate,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    totalDuration: parseFloat(params.totalDuration),
+    totalCost: parseFloat(params.totalCost),
+    courtName: params.courtName,
+    venueName: params.venueName,
+    selectedSlots: JSON.parse(params.selectedSlots || '[]'),
+    selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
+    customerId: params.customerId,
+    specialRequests: params.specialRequests || ''
+  });
+
   const [loading, setLoading] = useState(false);
-  const [specialRequests, setSpecialRequests] = useState("");
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState(null);
 
-  // Validation
-  const validateForm = () => {
-    if (!cardHolderName.trim()) {
-      Alert.alert('Error', 'Please enter card holder name');
-      return false;
+  // Validate that we have all required data
+  useEffect(() => {
+    if (!bookingData.venueId || !bookingData.courtId || !bookingData.customerId) {
+      Alert.alert("Error", "Missing booking information. Please go back and try again.");
+      navigation.goBack();
+      return;
     }
-    if (!cardNumber.replace(/\s/g, '').match(/^\d{16}$/)) {
-      Alert.alert('Error', 'Please enter a valid 16-digit card number');
-      return false;
-    }
-    if (!expiryDate.match(/^\d{2}\/\d{2}$/)) {
-      Alert.alert('Error', 'Please enter expiry date in MM/YY format');
-      return false;
-    }
-    if (!cvv.match(/^\d{3,4}$/)) {
-      Alert.alert('Error', 'Please enter a valid CVV');
-      return false;
-    }
-    return true;
-  };
+  }, [bookingData]);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+  const handleCreateBooking = async () => {
+    if (!user) {
+      Alert.alert("Authentication Required", "Please log in to continue with your booking.");
+      return;
+    }
 
     try {
       setLoading(true);
 
-      // Create the booking request in the format expected by the backend
+      // Prepare the booking request in the format expected by the backend
       const bookingRequest = {
-        customerId: bookingData.customerId,
-        bookingDate: bookingData.bookingDate,
+        customerId: parseInt(bookingData.customerId),
+        bookingDate: bookingData.selectedDate,
         startTime: bookingData.startTime,
         endTime: bookingData.endTime,
-        duration: bookingData.duration,
-        specialRequests: specialRequests,
-        // Transform to the expected backend format
+        duration: bookingData.totalDuration,
+        specialRequests: bookingData.specialRequests,
+        totalCost: bookingData.totalCost,
+        // Court bookings
         courtBookings: [{
-          courtId: bookingData.courtId,
-          timeDuration: bookingData.duration
+          courtId: parseInt(bookingData.courtId),
+          timeDuration: bookingData.totalDuration
         }],
-        equipmentBookings: (bookingData.selectedEquipment || []).map(equipment => ({
-          equipmentId: equipment.id,
+        // Equipment bookings
+        equipmentBookings: bookingData.selectedEquipment.map(equipment => ({
+          equipmentId: parseInt(equipment.id),
           quantity: equipment.quantity,
-          timeDuration: bookingData.duration
+          timeDuration: bookingData.totalDuration
         }))
       };
 
       console.log('Creating booking with data:', bookingRequest);
 
       // Create the booking
-      const createdBooking = await api.createBooking(bookingRequest);
-      console.log('Booking created:', createdBooking);
+      const createdBookingResponse = await api.createBooking(bookingRequest);
+      console.log('Booking created:', createdBookingResponse);
 
-      if (createdBooking && createdBooking.bookingId) {
-        // Create payment record
-        const paymentData = {
-          bookingId: createdBooking.bookingId,
-          amount: parseFloat(bookingData.totalCost),
-          paymentMethod: 'CREDIT_CARD',
-          status: 'PENDING',
-          transactionId: `TXN_${Date.now()}`,
-          paymentDate: new Date().toISOString()
-        };
-
-        console.log('Creating payment with data:', paymentData);
-        const createdPayment = await api.createPayment(paymentData);
-        console.log('Payment created:', createdPayment);
-
+      if (createdBookingResponse && createdBookingResponse.bookingId) {
+        setCreatedBooking(createdBookingResponse);
+        setBookingSuccess(true);
+        
         // Show success message
         Alert.alert(
-          'Booking Successful!',
+          'Booking Successful! 🎉',
           'Your court booking has been confirmed. You will receive a confirmation email shortly.',
           [
             {
-              text: 'View Bookings',
+              text: 'View My Bookings',
               onPress: () => {
-                onClose();
-                // Navigate to bookings list or profile
-                // You can implement navigation logic here
+                // Navigate to booking history
+                router.push('/profile');
               }
             },
             {
               text: 'OK',
-              onPress: onClose
+              onPress: () => {
+                // Go back to venue page
+                router.push(`/venue/${bookingData.venueId}`);
+              }
             }
           ]
         );
       } else {
-        throw new Error('Failed to create booking - no booking ID returned');
+        throw new Error('Invalid booking response');
       }
 
     } catch (error) {
       console.error('Error creating booking:', error);
       Alert.alert(
-        'Booking Failed',
-        error.message || 'An error occurred while creating your booking. Please try again.'
+        'Booking Failed', 
+        error.message || 'Failed to create booking. Please try again.'
       );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoBack = () => {
+    navigation.goBack();
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (timeString) => {
+    return timeString;
+  };
+
+  if (bookingSuccess) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <ScrollView className="flex-1">
+          {/* Success Header */}
+          <View className="bg-green-500 p-6">
+            <View className="items-center">
+              <CheckCircleIcon size={64} color="white" />
+              <Text className="text-2xl font-bold text-white mt-4">Booking Confirmed!</Text>
+              <Text className="text-white text-center mt-2">
+                Your booking has been successfully created
+              </Text>
+            </View>
+          </View>
+
+          {/* Booking Details */}
+          <View className="p-6">
+            <View className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+              <Text className="text-lg font-semibold text-gray-800 mb-3">Booking Details</Text>
+              <View className="space-y-2">
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Booking ID:</Text>
+                  <Text className="font-medium">#{createdBooking?.bookingId}</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Venue:</Text>
+                  <Text className="font-medium">{bookingData.venueName}</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Court:</Text>
+                  <Text className="font-medium">{bookingData.courtName}</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Date:</Text>
+                  <Text className="font-medium">{formatDate(bookingData.selectedDate)}</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Time:</Text>
+                  <Text className="font-medium">
+                    {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Total Cost:</Text>
+                  <Text className="font-bold text-green-600">LKR {bookingData.totalCost.toFixed(2)}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Next Steps */}
+            <View className="bg-blue-50 rounded-lg p-4 mb-4">
+              <Text className="text-lg font-semibold text-blue-800 mb-2">What's Next?</Text>
+              <Text className="text-blue-700 text-sm">
+                • You'll receive a confirmation email with your booking details{'\n'}
+                • Arrive 10 minutes before your scheduled time{'\n'}
+                • Check in at the venue reception{'\n'}
+                • Enjoy your game!
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="space-y-3">
+              <TouchableOpacity
+                onPress={() => router.push('/profile')}
+                className="bg-blue-600 p-4 rounded-lg"
+              >
+                <Text className="text-center text-white font-semibold text-lg">
+                  View My Bookings
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push(`/venue/${bookingData.venueId}`)}
+                className="bg-gray-600 p-4 rounded-lg"
+              >
+                <Text className="text-center text-white font-semibold text-lg">
+                  Back to Venue
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1">
-      <ScrollView className="p-0">
+    <SafeAreaView className="flex-1 bg-white">
+      <ScrollView>
+        {/* Header */}
+        <View className="flex-row items-center p-4 bg-orange-500">
+          <TouchableOpacity onPress={handleGoBack}>
+            <ArrowLeftIcon size={24} color="white" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-white ml-4">Complete Booking</Text>
+        </View>
+
         {/* Booking Summary */}
-        <View className="bg-gray-50 p-4 border-b border-gray-200">
-          <Text className="text-lg font-bold text-gray-800 mb-2">Booking Summary</Text>
-          <Text className="text-gray-600">{bookingData?.venue?.name || 'Venue'}</Text>
-          <Text className="text-gray-600">{bookingData?.court?.courtName || 'Court'}</Text>
-          <Text className="text-gray-600">
-            {bookingData?.duration} hours • {new Date(bookingData?.bookingDate).toLocaleDateString()}
-          </Text>
-          <Text className="text-lg font-bold text-orange-500 mt-2">
-            Total: LKR {bookingData?.totalCost?.toFixed(2) || '0.00'}
+        <View className="p-4">
+          <Text className="text-lg font-semibold mb-3">Booking Summary</Text>
+          <View className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Venue:</Text>
+              <Text className="font-medium">{bookingData.venueName}</Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Court:</Text>
+              <Text className="font-medium">{bookingData.courtName}</Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Date:</Text>
+              <Text className="font-medium">{formatDate(bookingData.selectedDate)}</Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Time:</Text>
+              <Text className="font-medium">
+                {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+              </Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Duration:</Text>
+              <Text className="font-medium">{bookingData.totalDuration} hours</Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Total Cost:</Text>
+              <Text className="font-bold text-orange-600">LKR {bookingData.totalCost.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Equipment Summary */}
+        {bookingData.selectedEquipment && bookingData.selectedEquipment.length > 0 && (
+          <View className="p-4">
+            <Text className="text-lg font-semibold mb-3">Equipment Summary</Text>
+            <View className="space-y-2">
+              {bookingData.selectedEquipment.map((equipment, index) => (
+                <View key={index} className="bg-gray-50 p-3 rounded-lg">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="font-medium text-gray-800">{equipment.name}</Text>
+                    <Text className="text-sm text-gray-600">Qty: {equipment.quantity}</Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-gray-600">Cost:</Text>
+                    <Text className="font-medium">LKR {equipment.totalCost.toFixed(2)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Special Requests */}
+        {bookingData.specialRequests && (
+          <View className="p-4">
+            <Text className="text-lg font-semibold mb-3">Special Requests</Text>
+            <View className="bg-blue-50 p-3 rounded-lg">
+              <Text className="text-blue-800">{bookingData.specialRequests}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Important Information */}
+        <View className="p-4">
+          <View className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <Text className="text-yellow-800 font-semibold mb-2">Important Information</Text>
+            <Text className="text-yellow-700 text-sm">
+              • Please arrive 10 minutes before your scheduled time{'\n'}
+              • Bring your own sports equipment unless rented{'\n'}
+              • Cancellation policy: 24 hours notice required{'\n'}
+              • Payment will be processed after booking confirmation
+            </Text>
+          </View>
+        </View>
+
+        {/* Terms and Conditions */}
+        <View className="p-4">
+          <Text className="text-sm text-gray-600 text-center">
+            By confirming this booking, you agree to our terms and conditions, 
+            cancellation policy, and venue rules.
           </Text>
         </View>
 
-        {/* Add New Card */}
-        <TouchableOpacity onPress={() => router.push("/add-card")}>
-          <Text
-            className="text-sm mb-2 mt-5 self-end mr-4"
-            style={{ color: "#FF4B00" }}
-          >
-            Add New Card +
-          </Text>
-        </TouchableOpacity>
-
-        {/* Card Details Section */}
-        <View className="bg-white w-full p-6 rounded-t-[20px]">
-          <Text className="text-black text-lg font-bold text-center mb-4">Card Details</Text>
-          <View className="border-b border-gray-300 mb-4" />
-
-          {/* Card Holder Name */}
-          <View className="mb-4 mt-4">
-            <Text className="text-black mb-2">CARD HOLDER NAME</Text>
-            <View className="flex-row items-center">
-              <Image
-                source={require("../../assets/icons/profile2.png")}
-                className="w-5 mt-2 h-5 mr-2"
-              />
-              <TextInput
-                value={cardHolderName}
-                onChangeText={setCardHolderName}
-                className="flex-1 ml-2 text-lg"
-                placeholder="Enter card holder name"
-                placeholderTextColor="gray"
-                style={{ lineHeight: 20 }}
-              />
-            </View>
-            <View className="h-[1px] bg-gray-300 mt-3" />
-          </View>
-
-          {/* Card Number */}
-          <View className="mb-4 mt-4">
-            <Text className="text-black mb-2">CARD NUMBER</Text>
-            <View className="flex-row items-center">
-              <Image
-                source={require("../../assets/icons/card.png")}
-                className="w-5 h-8 mr-2"
-              />
-              <TextInput
-                value={cardNumber}
-                onChangeText={(text) => {
-                  const cleaned = text.replace(/\D/g, "");
-                  const formatted = cleaned.match(/.{1,4}/g)?.join(" ") || "";
-                  setCardNumber(formatted);
-                }}
-                className="flex-1 ml-2 text-lg py-1"
-                placeholder="Enter card number"
-                placeholderTextColor="gray"
-                keyboardType="numeric"
-                style={{ lineHeight: 22 }}
-                maxLength={19}
-              />
-            </View>
-            <View className="h-[1px] bg-gray-300 mt-3" />
-          </View>
-
-          {/* Expiry and CVV */}
-          <View className="flex-row justify-between mb-4 mt-4">
-            <View className="flex-1 mr-2">
-              <Text className="text-black mb-2">VALID THRU</Text>
-              <View className="flex-row items-center">
-                <Image
-                  source={require("../../assets/icons/calender.png")}
-                  className="w-5 h-5 mr-2"
-                />
-                <TextInput
-                  value={expiryDate}
-                  onChangeText={(text) => {
-                    const cleaned = text.replace(/\D/g, "");
-                    if (cleaned.length >= 2) {
-                      setExpiryDate(cleaned.substring(0, 2) + "/" + cleaned.substring(2, 4));
-                    } else {
-                      setExpiryDate(cleaned);
-                    }
-                  }}
-                  className="flex-1 text-lg"
-                  placeholder="MM/YY"
-                  placeholderTextColor="gray"
-                  keyboardType="numeric"
-                  maxLength={5}
-                />
-              </View>
-              <View className="h-[1px] bg-gray-300 mt-3" />
-            </View>
-
-            <View className="flex-1 ml-2">
-              <Text className="text-black mb-2">CVV/CVC</Text>
-              <View className="flex-row items-center">
-                <Image
-                  source={require("../../assets/icons/lock.png")}
-                  className="w-5 h-5 mr-2"
-                />
-                <TextInput
-                  value={cvv}
-                  onChangeText={setCvv}
-                  className="flex-1 text-lg"
-                  placeholder="CVV"
-                  placeholderTextColor="gray"
-                  keyboardType="numeric"
-                  secureTextEntry
-                  maxLength={4}
-                />
-              </View>
-              <View className="h-[1px] bg-gray-300 mt-3" />
-            </View>
-          </View>
-
-          {/* Special Requests */}
-          <View className="mb-4 mt-4">
-            <Text className="text-black mb-2">SPECIAL REQUESTS (Optional)</Text>
-            <TextInput
-              value={specialRequests}
-              onChangeText={setSpecialRequests}
-              className="border border-gray-300 p-3 rounded-lg"
-              placeholder="Any special requests or notes..."
-              placeholderTextColor="gray"
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-
+        {/* Confirm Booking Button */}
+        <View className="p-4">
           <TouchableOpacity
-            onPress={() => setSaveCard(!saveCard)}
-            className="flex-row items-center mt-4"
-          >
-            <Image
-              source={{
-                uri: saveCard
-                  ? "https://img.icons8.com/ios-filled/20/000000/checked.png"
-                  : "https://img.icons8.com/ios/20/000000/unchecked-checkbox.png",
-              }}
-              className="w-5 h-5 mr-2"
-            />
-            <Text className="text-black text-sm">
-              Save the card details for faster payment
-            </Text>
-          </TouchableOpacity>
-
-          {/* Pay Button */}
-          <TouchableOpacity
-            onPress={handleSubmit}
+            onPress={handleCreateBooking}
             disabled={loading}
-            className={`mt-14 p-3 rounded-lg ${
-              loading ? 'bg-gray-400' : 'bg-orange-500'
+            className={`p-4 rounded-lg ${
+              loading ? 'bg-gray-300' : 'bg-orange-500'
             }`}
           >
-            <Text className="text-white text-center text-lg font-bold">
-              {loading ? 'Processing...' : 'Pay →'}
-            </Text>
+            {loading ? (
+              <View className="flex-row items-center justify-center">
+                <ActivityIndicator color="white" size="small" />
+                <Text className="text-white font-semibold text-lg ml-2">
+                  Creating Booking...
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-center text-white font-semibold text-lg">
+                Confirm & Create Booking
+              </Text>
+            )}
           </TouchableOpacity>
 
-          {/* Security Notice */}
-          <View className="mt-6 bg-blue-50 p-3 rounded-lg">
-            <Text className="text-xs text-blue-800 text-center">
-              🔒 Your payment information is secure and encrypted. 
-              We use industry-standard security measures to protect your data.
+          <TouchableOpacity
+            onPress={handleGoBack}
+            className="p-4 border border-gray-300 rounded-lg mt-3"
+          >
+            <Text className="text-center text-gray-700 font-medium">
+              Back to Order Summary
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
