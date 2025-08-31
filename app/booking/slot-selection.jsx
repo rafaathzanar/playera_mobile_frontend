@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeftIcon } from "react-native-heroicons/solid";
@@ -73,19 +74,8 @@ export default function SlotSelection() {
   const fetchEquipment = async () => {
     try {
       setEquipmentLoading(true);
-      console.log('Fetching equipment for court:', courtId);
-      
-      // Call getEquipment with courtId instead of venueId
-      const equipmentData = await api.getEquipment(courtId);
-      console.log('Equipment data received:', equipmentData);
-      
-      if (equipmentData && Array.isArray(equipmentData)) {
-        setEquipment(equipmentData);
-        console.log('Equipment set successfully:', equipmentData.length, 'items');
-      } else {
-        console.log('No equipment data or invalid format:', equipmentData);
-        setEquipment([]);
-      }
+      const equipmentData = await api.getEquipment(venueId);
+      setEquipment(equipmentData || []);
     } catch (error) {
       console.error("Error fetching equipment:", error);
       setEquipment([]);
@@ -211,47 +201,56 @@ export default function SlotSelection() {
     return { totalDuration, courtCost, equipmentCost, totalCost };
   };
 
-  // Get calculated totals
-  const { totalDuration, courtCost, equipmentCost, totalCost } = calculateTotals();
-
   // Handle proceed to order summary
   const handleProceed = () => {
-    if (!user) {
-      Alert.alert("Authentication Required", "Please log in to continue with your booking.");
-      return;
-    }
-
     if (selectedSlots.length === 0) {
-      Alert.alert("No Slots Selected", "Please select at least one time slot to continue.");
+      Alert.alert("No Slots Selected", "Please select at least one time slot.");
       return;
     }
 
-    // Prepare data for navigation
-    const bookingData = {
-      venueId,
-      courtId,
-      selectedDate,
-      startTime: selectedSlots[0].startTime,
-      endTime: selectedSlots[selectedSlots.length - 1].endTime,
-      totalDuration,
-      totalCost,
-      courtName: court?.courtName || 'Unknown Court',
-      venueName: venue?.name || 'Unknown Venue',
-      selectedSlots: JSON.stringify(selectedSlots),
-      selectedEquipment: JSON.stringify(selectedEquipment),
-      customerId: user.userId
-    };
+    const { totalDuration, totalCost } = calculateTotals();
+    
+    // Prepare equipment data for next page
+    const selectedEquipmentData = Object.entries(selectedEquipment).map(([equipmentId, quantity]) => {
+      const equipmentItem = equipment.find(e => e.equipmentId == equipmentId);
+      if (!equipmentItem) {
+        console.error('Equipment not found for ID:', equipmentId);
+        return null;
+      }
+      return {
+        id: equipmentItem.equipmentId,
+        name: equipmentItem.name,
+        quantity: quantity,
+        ratePerHour: equipmentItem.ratePerHour,
+        totalCost: equipmentItem.ratePerHour * quantity * totalDuration
+      };
+    }).filter(item => item !== null);
 
-    // Navigate to order summary
+    // Prepare slot data for booking
+    const slotData = selectedSlots.map(slot => ({
+      slotId: slot.slotId,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      date: selectedDate
+    }));
+
     router.push({
       pathname: "/booking/order-summary",
-      params: bookingData
+      params: {
+        venueId,
+        courtId,
+        selectedDate,
+        startTime: selectedSlots[0].startTime,
+        endTime: selectedSlots[selectedSlots.length - 1].endTime,
+        totalDuration,
+        totalCost,
+        courtName: court?.courtName,
+        venueName: venue?.name,
+        selectedSlots: JSON.stringify(slotData),
+        selectedEquipment: JSON.stringify(selectedEquipmentData),
+        customerId: user?.userId
+      }
     });
-  };
-
-  // Handle go back
-  const handleGoBack = () => {
-    navigation.goBack();
   };
 
   if (loading) {
@@ -262,12 +261,14 @@ export default function SlotSelection() {
     );
   }
 
+  const { totalDuration, courtCost, equipmentCost, totalCost } = calculateTotals();
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView>
         {/* Header */}
         <View className="flex-row items-center p-4 bg-orange-500">
-          <TouchableOpacity onPress={handleGoBack}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
             <ArrowLeftIcon size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-xl font-bold text-white ml-4">Select Slots & Equipment</Text>
@@ -310,96 +311,104 @@ export default function SlotSelection() {
               </View>
             ) : availableSlots.length > 0 ? (
               <View className="flex-row flex-wrap gap-2">
-                {availableSlots.map((slot) => {
-                  const isSelected = selectedSlots.find(s => s.id === slot.id);
-                  return (
-                    <TouchableOpacity
-                      key={slot.id}
-                      onPress={() => toggleSlot(slot)}
-                      className={`px-4 py-3 rounded-lg border-2 ${
-                        isSelected
-                          ? "bg-orange-500 border-orange-500"
+                {availableSlots.map((slot) => (
+                  <TouchableOpacity
+                    key={slot.id}
+                    onPress={() => toggleSlot(slot)}
+                    className={`p-3 rounded-lg border-2 ${
+                      selectedSlots.find(s => s.id === slot.id)
+                        ? 'border-orange-500 bg-orange-100'
+                        : slot.available
+                        ? 'border-gray-300 bg-white'
+                        : 'border-gray-200 bg-gray-100'
+                    }`}
+                    disabled={!slot.available}
+                  >
+                    <Text
+                      className={`text-sm font-medium ${
+                        selectedSlots.find(s => s.id === slot.id)
+                          ? 'text-orange-800'
                           : slot.available
-                          ? "bg-white border-gray-300"
-                          : "bg-gray-200 border-gray-200"
+                          ? 'text-gray-800'
+                          : 'text-gray-500'
                       }`}
-                      disabled={!slot.available}
                     >
-                      <Text
-                        className={`font-medium ${
-                          isSelected
-                            ? "text-white"
-                            : slot.available
-                            ? "text-gray-800"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {slot.time}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      {slot.time}
+                    </Text>
+                    <Text
+                      className={`text-xs ${
+                        selectedSlots.find(s => s.id === slot.id)
+                          ? 'text-orange-600'
+                          : slot.available
+                          ? 'text-gray-600'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {slot.available ? 'Available' : slot.status}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             ) : (
-              <Text className="text-gray-600 text-center py-4">
-                No time slots available for {selectedDate}. Please select a different date.
-              </Text>
+              <View className="py-8">
+                <Text className="text-center text-gray-500">No slots available for this date</Text>
+              </View>
             )}
           </View>
         )}
 
         {/* Equipment Selection */}
-        <View className="p-4">
-          <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
-          {equipmentLoading ? (
-            <Text className="text-center text-gray-500">Loading equipment...</Text>
-          ) : equipment.length > 0 ? (
-            <View className="space-y-4">
-              {equipment.map((eq) => (
-                <View key={eq.equipmentId} className="bg-gray-50 p-4 rounded-lg">
-                  <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-medium text-gray-800">{eq.name}</Text>
-                    <Text className="text-sm text-gray-600">LKR {eq.ratePerHour}/hour</Text>
-                  </View>
-                  <Text className="text-sm text-gray-600 mb-3">{eq.description}</Text>
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-sm text-gray-600">
-                      Available: {eq.availableQuantity}/{eq.totalQuantity}
-                    </Text>
-                    <View className="flex-row items-center space-x-2">
-                      <TouchableOpacity
-                        onPress={() => decreaseEquipmentQuantity(eq.equipmentId)}
-                        className="w-8 h-8 bg-gray-300 rounded-full items-center justify-center"
-                      >
-                        <Text className="text-gray-700 font-bold">-</Text>
-                      </TouchableOpacity>
-                      <Text className="w-8 text-center font-medium">
-                        {selectedEquipment[eq.equipmentId] || 0}
+        {equipment.length > 0 && (
+          <View className="p-4">
+            <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
+            {equipmentLoading ? (
+              <Text className="text-center text-gray-500">Loading equipment...</Text>
+            ) : (
+              <View className="space-y-4">
+                {equipment.map((eq) => (
+                  <View key={eq.equipmentId} className="bg-gray-50 p-4 rounded-lg">
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="font-medium text-gray-800">{eq.name}</Text>
+                      <Text className="text-sm text-gray-600">LKR {eq.ratePerHour}/hour</Text>
+                    </View>
+                    <Text className="text-sm text-gray-600 mb-3">{eq.description}</Text>
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-sm text-gray-600">
+                        Available: {eq.availableQuantity}/{eq.totalQuantity}
                       </Text>
-                      <TouchableOpacity
-                        onPress={() => increaseEquipmentQuantity(eq.equipmentId)}
-                        disabled={!eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity}
-                        className={`w-8 h-8 rounded-full items-center justify-center ${
-                          !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
-                            ? 'bg-gray-200'
-                            : 'bg-orange-500'
-                        }`}
-                      >
-                        <Text className={`font-bold ${
-                          !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
-                            ? 'text-gray-400'
-                            : 'text-white'
-                        }`}>+</Text>
-                      </TouchableOpacity>
+                      <View className="flex-row items-center space-x-2">
+                        <TouchableOpacity
+                          onPress={() => decreaseEquipmentQuantity(eq.equipmentId)}
+                          className="w-8 h-8 bg-gray-300 rounded-full items-center justify-center"
+                        >
+                          <Text className="text-gray-700 font-bold">-</Text>
+                        </TouchableOpacity>
+                        <Text className="w-8 text-center font-medium">
+                          {selectedEquipment[eq.equipmentId] || 0}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => increaseEquipmentQuantity(eq.equipmentId)}
+                          disabled={!eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity}
+                          className={`w-8 h-8 rounded-full items-center justify-center ${
+                            !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
+                              ? 'bg-gray-200'
+                              : 'bg-orange-500'
+                          }`}
+                        >
+                          <Text className={`font-bold ${
+                            !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
+                              ? 'text-gray-400'
+                              : 'text-white'
+                          }`}>+</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text className="text-center text-gray-500 py-4">No equipment available for this court</Text>
-          )}
-        </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Cost Summary */}
         <View className="p-4 bg-gray-50">
@@ -436,9 +445,7 @@ export default function SlotSelection() {
             }`}
           >
             <Text className="text-center text-white font-semibold text-lg">
-              {selectedSlots.length === 0
-                ? "Select Time Slots to Continue"
-                : "Proceed to Order Summary"}
+              Proceed to Order Summary
             </Text>
           </TouchableOpacity>
         </View>

@@ -164,8 +164,13 @@ class ApiService {
     return await this.request(endpoint);
   }
 
-  async getCourtById(id) {
-    return await this.request(`/courts/${id}`);
+  async getCourtById(courtId) {
+    return await this.request(`/courts/${courtId}`);
+  }
+
+  // Get dynamic pricing settings for a court
+  async getDynamicPricingSettings(courtId) {
+    return await this.request(`/courts/${courtId}/dynamic-pricing`);
   }
 
   async getCourtAvailability(courtId, date) {
