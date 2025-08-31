@@ -13,11 +13,11 @@ class WebSocketService {
   connect() {
     if (this.isConnected) return;
 
-    const socket = new SockJS('http://localhost:8080/ws');
+    const socket = new SockJS("http://localhost:8080/ws");
     this.stompClient = new Client({
       webSocketFactory: () => socket,
       debug: (str) => {
-        console.log('STOMP Debug:', str);
+        console.log("STOMP Debug:", str);
       },
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
@@ -25,23 +25,23 @@ class WebSocketService {
     });
 
     this.stompClient.onConnect = (frame) => {
-      console.log('Connected to WebSocket:', frame);
+      console.log("Connected to WebSocket:", frame);
       this.isConnected = true;
       this.reconnectAttempts = 0;
     };
 
     this.stompClient.onStompError = (frame) => {
-      console.error('STOMP error:', frame);
+      console.error("STOMP error:", frame);
       this.isConnected = false;
     };
 
     this.stompClient.onWebSocketError = (error) => {
-      console.error('WebSocket error:', error);
+      console.error("WebSocket error:", error);
       this.isConnected = false;
     };
 
     this.stompClient.onWebSocketClose = () => {
-      console.log('WebSocket connection closed');
+      console.log("WebSocket connection closed");
       this.isConnected = false;
     };
 
@@ -57,7 +57,7 @@ class WebSocketService {
 
   subscribeToCustomerBookings(customerId, onMessage) {
     if (!this.isConnected || !this.stompClient) {
-      console.log('WebSocket not connected, attempting to connect...');
+      console.log("WebSocket not connected, attempting to connect...");
       this.connect();
       // Wait for connection before subscribing
       setTimeout(() => {
@@ -67,15 +67,15 @@ class WebSocketService {
     }
 
     const destination = `/user/${customerId}/queue/bookings`;
-    console.log('Subscribing to:', destination);
+    console.log("Subscribing to:", destination);
 
     this.stompClient.subscribe(destination, (message) => {
       try {
         const data = JSON.parse(message.body);
-        console.log('Received WebSocket message:', data);
+        console.log("Received WebSocket message:", data);
         onMessage(data);
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error("Error parsing WebSocket message:", error);
       }
     });
   }
@@ -83,10 +83,13 @@ class WebSocketService {
   handleReconnect(customerId, onMessage) {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      
-      console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-      
+      const delay =
+        this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+
+      console.log(
+        `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`
+      );
+
       setTimeout(() => {
         this.connect();
         setTimeout(() => {
@@ -94,7 +97,7 @@ class WebSocketService {
         }, 1000);
       }, delay);
     } else {
-      console.error('Max reconnection attempts reached');
+      console.error("Max reconnection attempts reached");
     }
   }
 
@@ -102,10 +105,10 @@ class WebSocketService {
     if (this.isConnected && this.stompClient) {
       this.stompClient.publish({
         destination,
-        body: JSON.stringify(message)
+        body: JSON.stringify(message),
       });
     } else {
-      console.error('WebSocket not connected');
+      console.error("WebSocket not connected");
     }
   }
 }

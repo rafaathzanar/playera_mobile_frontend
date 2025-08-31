@@ -73,8 +73,19 @@ export default function SlotSelection() {
   const fetchEquipment = async () => {
     try {
       setEquipmentLoading(true);
-      const equipmentData = await api.getEquipment(venueId);
-      setEquipment(equipmentData || []);
+      console.log('Fetching equipment for court:', courtId);
+      
+      // Call getEquipment with courtId instead of venueId
+      const equipmentData = await api.getEquipment(courtId);
+      console.log('Equipment data received:', equipmentData);
+      
+      if (equipmentData && Array.isArray(equipmentData)) {
+        setEquipment(equipmentData);
+        console.log('Equipment set successfully:', equipmentData.length, 'items');
+      } else {
+        console.log('No equipment data or invalid format:', equipmentData);
+        setEquipment([]);
+      }
     } catch (error) {
       console.error("Error fetching equipment:", error);
       setEquipment([]);
@@ -338,57 +349,57 @@ export default function SlotSelection() {
         )}
 
         {/* Equipment Selection */}
-        {equipment.length > 0 && (
-          <View className="p-4">
-            <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
-            {equipmentLoading ? (
-              <Text className="text-center text-gray-500">Loading equipment...</Text>
-            ) : (
-              <View className="space-y-4">
-                {equipment.map((eq) => (
-                  <View key={eq.equipmentId} className="bg-gray-50 p-4 rounded-lg">
-                    <View className="flex-row justify-between items-center mb-2">
-                      <Text className="font-medium text-gray-800">{eq.name}</Text>
-                      <Text className="text-sm text-gray-600">LKR {eq.ratePerHour}/hour</Text>
-                    </View>
-                    <Text className="text-sm text-gray-600 mb-3">{eq.description}</Text>
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-sm text-gray-600">
-                        Available: {eq.availableQuantity}/{eq.totalQuantity}
+        <View className="p-4">
+          <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
+          {equipmentLoading ? (
+            <Text className="text-center text-gray-500">Loading equipment...</Text>
+          ) : equipment.length > 0 ? (
+            <View className="space-y-4">
+              {equipment.map((eq) => (
+                <View key={eq.equipmentId} className="bg-gray-50 p-4 rounded-lg">
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="font-medium text-gray-800">{eq.name}</Text>
+                    <Text className="text-sm text-gray-600">LKR {eq.ratePerHour}/hour</Text>
+                  </View>
+                  <Text className="text-sm text-gray-600 mb-3">{eq.description}</Text>
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-sm text-gray-600">
+                      Available: {eq.availableQuantity}/{eq.totalQuantity}
+                    </Text>
+                    <View className="flex-row items-center space-x-2">
+                      <TouchableOpacity
+                        onPress={() => decreaseEquipmentQuantity(eq.equipmentId)}
+                        className="w-8 h-8 bg-gray-300 rounded-full items-center justify-center"
+                      >
+                        <Text className="text-gray-700 font-bold">-</Text>
+                      </TouchableOpacity>
+                      <Text className="w-8 text-center font-medium">
+                        {selectedEquipment[eq.equipmentId] || 0}
                       </Text>
-                      <View className="flex-row items-center space-x-2">
-                        <TouchableOpacity
-                          onPress={() => decreaseEquipmentQuantity(eq.equipmentId)}
-                          className="w-8 h-8 bg-gray-300 rounded-full items-center justify-center"
-                        >
-                          <Text className="text-gray-700 font-bold">-</Text>
-                        </TouchableOpacity>
-                        <Text className="w-8 text-center font-medium">
-                          {selectedEquipment[eq.equipmentId] || 0}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => increaseEquipmentQuantity(eq.equipmentId)}
-                          disabled={!eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity}
-                          className={`w-8 h-8 rounded-full items-center justify-center ${
-                            !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
-                              ? 'bg-gray-200'
-                              : 'bg-orange-500'
-                          }`}
-                        >
-                          <Text className={`font-bold ${
-                            !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
-                              ? 'text-gray-400'
-                              : 'text-white'
-                          }`}>+</Text>
-                        </TouchableOpacity>
-                      </View>
+                      <TouchableOpacity
+                        onPress={() => increaseEquipmentQuantity(eq.equipmentId)}
+                        disabled={!eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity}
+                        className={`w-8 h-8 rounded-full items-center justify-center ${
+                          !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
+                            ? 'bg-gray-200'
+                            : 'bg-orange-500'
+                        }`}
+                      >
+                        <Text className={`font-bold ${
+                          !eq.availableQuantity || (selectedEquipment[eq.equipmentId] || 0) >= eq.availableQuantity
+                            ? 'text-gray-400'
+                            : 'text-white'
+                        }`}>+</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text className="text-center text-gray-500 py-4">No equipment available for this court</Text>
+          )}
+        </View>
 
         {/* Cost Summary */}
         <View className="p-4 bg-gray-50">
