@@ -10,10 +10,12 @@ import {
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +27,14 @@ export default function BookingHistoryScreen() {
   const loadBookingHistory = async () => {
     try {
       setLoading(true);
-      const bookingData = await api.getBookings();
+      
+      if (!user || !user.userId) {
+        console.log("No user found, cannot load booking history");
+        setBookings([]);
+        return;
+      }
+
+      const bookingData = await api.getBookingsByCustomer(user.userId);
       console.log("Booking history data:", bookingData);
       
       // Handle paginated response structure

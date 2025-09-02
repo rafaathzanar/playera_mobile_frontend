@@ -68,10 +68,21 @@ export default function OrderSummary() {
     router.push({
       pathname: "/booking/checkout",
       params: {
-        ...bookingData,
-        totalCost: calculateTotalCost(), // Update total cost to include equipment
-        specialRequests,
-        customerId: user.userId
+        venueId: bookingData.venueId,
+        courtId: bookingData.courtId,
+        selectedDate: bookingData.selectedDate,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        totalDuration: bookingData.totalDuration.toString(),
+        totalCost: calculateTotalCost().toString(),
+        courtCost: bookingData.courtCost.toString(),
+        equipmentCost: bookingData.equipmentCost.toString(),
+        courtName: bookingData.courtName,
+        venueName: bookingData.venueName,
+        selectedSlots: JSON.stringify(bookingData.selectedSlots),
+        selectedEquipment: JSON.stringify(bookingData.selectedEquipment),
+        customerId: user.userId,
+        specialRequests: specialRequests
       }
     });
   };

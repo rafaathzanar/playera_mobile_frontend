@@ -216,6 +216,10 @@ class ApiService {
     return await this.request(endpoint);
   }
 
+  async getBookingsByCustomer(customerId) {
+    return await this.request(`/bookings/customer/${customerId}`);
+  }
+
   async getBookingById(id) {
     return await this.request(`/bookings/${id}`);
   }

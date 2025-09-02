@@ -31,10 +31,26 @@ export default function Checkout() {
     endTime: params.endTime,
     totalDuration: parseFloat(params.totalDuration),
     totalCost: parseFloat(params.totalCost),
+    courtCost: parseFloat(params.courtCost) || 0,
+    equipmentCost: parseFloat(params.equipmentCost) || 0,
     courtName: params.courtName,
     venueName: params.venueName,
-    selectedSlots: JSON.parse(params.selectedSlots || '[]'),
-    selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
+    selectedSlots: (() => {
+      try {
+        return JSON.parse(params.selectedSlots || '[]');
+      } catch (error) {
+        console.error('Error parsing selectedSlots:', error);
+        return [];
+      }
+    })(),
+    selectedEquipment: (() => {
+      try {
+        return JSON.parse(params.selectedEquipment || '[]');
+      } catch (error) {
+        console.error('Error parsing selectedEquipment:', error);
+        return [];
+      }
+    })(),
     customerId: params.customerId,
     specialRequests: params.specialRequests || ''
   });
@@ -64,26 +80,50 @@ export default function Checkout() {
       // Prepare the booking request in the format expected by the backend
       const bookingRequest = {
         customerId: parseInt(bookingData.customerId),
-        bookingDate: bookingData.selectedDate,
-        startTime: bookingData.startTime,
-        endTime: bookingData.endTime,
-        duration: bookingData.totalDuration,
-        specialRequests: bookingData.specialRequests,
-        totalCost: bookingData.totalCost,
+        bookingDate: bookingData.selectedDate, // Should be in YYYY-MM-DD format
+        startTime: bookingData.startTime, // Should be in HH:MM:SS format
+        endTime: bookingData.endTime, // Should be in HH:MM:SS format
+        duration: parseInt(bookingData.totalDuration), // Must be integer
+        specialRequests: bookingData.specialRequests || "",
         // Court bookings
         courtBookings: [{
           courtId: parseInt(bookingData.courtId),
-          timeDuration: bookingData.totalDuration
+          timeDuration: parseInt(bookingData.totalDuration)
         }],
         // Equipment bookings
-        equipmentBookings: bookingData.selectedEquipment.map(equipment => ({
-          equipmentId: parseInt(equipment.id),
-          quantity: equipment.quantity,
-          timeDuration: bookingData.totalDuration
-        }))
+        equipmentBookings: bookingData.selectedEquipment && bookingData.selectedEquipment.length > 0 
+          ? bookingData.selectedEquipment.map(equipment => ({
+              equipmentId: parseInt(equipment.id),
+              quantity: parseInt(equipment.quantity),
+              timeDuration: parseInt(bookingData.totalDuration)
+            }))
+          : []
       };
 
       console.log('Creating booking with data:', bookingRequest);
+      console.log('Current user:', user);
+      console.log('User ID:', user?.userId);
+      console.log('Customer ID in request:', bookingRequest.customerId);
+      console.log('Raw booking data from params:', {
+        selectedDate: bookingData.selectedDate,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        totalDuration: bookingData.totalDuration,
+        customerId: bookingData.customerId
+      });
+
+      // Validate required fields
+      if (!bookingRequest.customerId || !bookingRequest.bookingDate || !bookingRequest.startTime || !bookingRequest.endTime) {
+        Alert.alert("Validation Error", "Missing required booking information. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (!bookingRequest.courtBookings || bookingRequest.courtBookings.length === 0) {
+        Alert.alert("Validation Error", "No court selected for booking. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       // Create the booking
       const createdBookingResponse = await api.createBooking(bookingRequest);

@@ -21,9 +21,13 @@ export default function CalendarScreen() {
   const fetchUserBookings = async () => {
     try {
       setLoading(true);
-      const response = await api.getBookings({ customerId: user.userId });
-      if (response && Array.isArray(response)) {
-        setBookings(response);
+      const response = await api.getBookingsByCustomer(user.userId);
+      console.log("Calendar bookings data:", response);
+      
+      // Handle paginated response structure
+      const bookingsData = response.content || response;
+      if (Array.isArray(bookingsData)) {
+        setBookings(bookingsData);
       } else {
         setBookings([]);
       }
