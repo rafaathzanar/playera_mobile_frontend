@@ -74,7 +74,9 @@ export default function SlotSelection() {
   const fetchEquipment = async () => {
     try {
       setEquipmentLoading(true);
-      const equipmentData = await api.getEquipment(venueId);
+      console.log("Fetching equipment for courtId:", courtId);
+      const equipmentData = await api.getEquipment(courtId);
+      console.log("Equipment data received:", equipmentData);
       setEquipment(equipmentData || []);
     } catch (error) {
       console.error("Error fetching equipment:", error);
@@ -358,14 +360,13 @@ export default function SlotSelection() {
         )}
 
         {/* Equipment Selection */}
-        {equipment.length > 0 && (
-          <View className="p-4">
-            <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
-            {equipmentLoading ? (
-              <Text className="text-center text-gray-500">Loading equipment...</Text>
-            ) : (
-              <View className="space-y-4">
-                {equipment.map((eq) => (
+        <View className="p-4">
+          <Text className="text-lg font-semibold mb-3">Available Equipment</Text>
+          {equipmentLoading ? (
+            <Text className="text-center text-gray-500">Loading equipment...</Text>
+          ) : equipment.length > 0 ? (
+            <View className="space-y-4">
+              {equipment.map((eq) => (
                   <View key={eq.equipmentId} className="bg-gray-50 p-4 rounded-lg">
                     <View className="flex-row justify-between items-center mb-2">
                       <Text className="font-medium text-gray-800">{eq.name}</Text>
@@ -406,9 +407,12 @@ export default function SlotSelection() {
                   </View>
                 ))}
               </View>
+            ) : (
+              <Text className="text-center text-gray-500 py-4">
+                No equipment available for this court
+              </Text>
             )}
           </View>
-        )}
 
         {/* Cost Summary */}
         <View className="p-4 bg-gray-50">
