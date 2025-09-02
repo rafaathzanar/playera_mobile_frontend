@@ -246,6 +246,8 @@ export default function SlotSelection() {
         endTime: selectedSlots[selectedSlots.length - 1].endTime,
         totalDuration,
         totalCost,
+        courtCost, // Pass court cost separately
+        equipmentCost, // Pass equipment cost separately
         courtName: court?.courtName,
         venueName: venue?.name,
         selectedSlots: JSON.stringify(slotData),

@@ -31,6 +31,8 @@ export default function OrderSummary() {
     endTime: params.endTime,
     totalDuration: parseFloat(params.totalDuration),
     totalCost: parseFloat(params.totalCost),
+    courtCost: parseFloat(params.courtCost) || 0, // Court cost only
+    equipmentCost: parseFloat(params.equipmentCost) || 0, // Equipment cost only
     courtName: params.courtName,
     venueName: params.venueName,
     selectedSlots: JSON.parse(params.selectedSlots || '[]'),
@@ -40,6 +42,12 @@ export default function OrderSummary() {
 
   const [specialRequests, setSpecialRequests] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Calculate total cost (already calculated in slot selection)
+  const calculateTotalCost = () => {
+    // The totalCost already includes both court and equipment costs
+    return bookingData.totalCost || 0;
+  };
 
   // Validate that we have all required data
   useEffect(() => {
@@ -61,6 +69,7 @@ export default function OrderSummary() {
       pathname: "/booking/checkout",
       params: {
         ...bookingData,
+        totalCost: calculateTotalCost(), // Update total cost to include equipment
         specialRequests,
         customerId: user.userId
       }
@@ -132,7 +141,7 @@ export default function OrderSummary() {
             </View>
             <View className="flex-row justify-between">
               <Text className="text-gray-600">Court Cost:</Text>
-              <Text className="font-medium">LKR {bookingData.totalCost.toFixed(2)}</Text>
+              <Text className="font-medium">LKR {bookingData.courtCost.toFixed(2)}</Text>
             </View>
           </View>
         </View>
@@ -172,14 +181,27 @@ export default function OrderSummary() {
           />
         </View>
 
-        {/* Total Cost */}
+        {/* Cost Breakdown */}
         <View className="p-4">
-          <View className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <View className="flex-row justify-between items-center">
-              <Text className="text-lg font-semibold text-orange-800">Total Cost</Text>
-              <Text className="text-2xl font-bold text-orange-600">
-                LKR {bookingData.totalCost.toFixed(2)}
-              </Text>
+          <Text className="text-lg font-semibold mb-3">Cost Breakdown</Text>
+          <View className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Court Cost:</Text>
+              <Text className="font-medium">LKR {bookingData.courtCost.toFixed(2)}</Text>
+            </View>
+            {bookingData.equipmentCost > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-gray-600">Equipment Cost:</Text>
+                <Text className="font-medium">LKR {bookingData.equipmentCost.toFixed(2)}</Text>
+              </View>
+            )}
+            <View className="border-t border-gray-300 pt-2 mt-2">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-lg font-semibold text-orange-800">Total Cost</Text>
+                <Text className="text-xl font-bold text-orange-600">
+                  LKR {calculateTotalCost().toFixed(2)}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
