@@ -84,8 +84,14 @@ export const AuthProvider = ({ children }) => {
       await api.logout();
       setUser(null);
       setIsAuthenticated(false);
+      // Clear any cached data
+      await AsyncStorage.removeItem("authToken");
     } catch (error) {
       console.error("Logout error:", error);
+      // Even if API call fails, clear local state
+      setUser(null);
+      setIsAuthenticated(false);
+      await AsyncStorage.removeItem("authToken");
     }
   };
 
@@ -135,5 +141,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-

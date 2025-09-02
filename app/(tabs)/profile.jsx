@@ -55,7 +55,7 @@
 //           onPress: () => {
 //             // Implement delete account API call here
 //             Alert.alert("Account deleted");
-//             router.replace("/auth/sign-in");
+//             router.replace("/(auth)/sign-in");
 //           },
 //         },
 //       ]
@@ -63,7 +63,7 @@
 //   };
 
 //   const handleLogout = () => {
-//     router.replace("/auth/sign-in");
+//     router.replace("/(auth)/sign-in");
 //   };
 
 //   return (
@@ -173,7 +173,7 @@ import {
 } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import Modal from "react-native-modal";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 
@@ -193,10 +193,24 @@ const ProfileScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
-  // Load user profile on component mount
+  // Load user profile when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserProfile();
+    }, [])
+  );
+
+  // Sync with AuthContext user data when it changes
   useEffect(() => {
-    loadUserProfile();
-  }, []);
+    if (authUser) {
+      setUser({
+        name: authUser.name || "",
+        email: authUser.email || "",
+        phone: authUser.phone || "",
+        profileImage: authUser.profileImage || null,
+      });
+    }
+  }, [authUser]);
 
   const loadUserProfile = async () => {
     try {
@@ -204,6 +218,7 @@ const ProfileScreen = () => {
       const profileData = await api.getUserProfile();
       console.log("Profile data received:", profileData);
       
+      // Update local state
       setUser({
         name: profileData.name || "",
         email: profileData.email || "",
@@ -212,7 +227,17 @@ const ProfileScreen = () => {
       });
     } catch (error) {
       console.error("Error loading profile:", error);
-      Alert.alert("Error", "Failed to load profile data");
+      // If API fails, use AuthContext data as fallback
+      if (authUser) {
+        setUser({
+          name: authUser.name || "",
+          email: authUser.email || "",
+          phone: authUser.phone || "",
+          profileImage: authUser.profileImage || null,
+        });
+      } else {
+        Alert.alert("Error", "Failed to load profile data");
+      }
     } finally {
       setIsLoadingProfile(false);
     }
@@ -239,11 +264,14 @@ const ProfileScreen = () => {
             setIsLoading(true);
             try {
               await api.logout();
-              logout();
-              router.replace("/auth/sign-in");
+              await logout();
+              // Use replace to prevent going back to profile
+              router.replace("/(auth)/sign-in");
             } catch (error) {
               console.error("Logout error:", error);
-              Alert.alert("Error", "Failed to log out. Please try again.");
+              // Even if logout fails, clear local state and redirect
+              await logout();
+              router.replace("/(auth)/sign-in");
             } finally {
               setIsLoading(false);
             }
@@ -270,9 +298,15 @@ const ProfileScreen = () => {
             setIsLoading(true);
             try {
               await api.deleteAccount();
-              Alert.alert("Success", "Account deleted successfully");
-              logout();
-              router.replace("/auth/sign-in");
+              Alert.alert("Success", "Account deleted successfully", [
+                {
+                  text: "OK",
+                  onPress: async () => {
+                    await logout();
+                    router.replace("/(auth)/sign-in");
+                  },
+                },
+              ]);
             } catch (error) {
               console.error("Delete account error:", error);
               Alert.alert("Error", "Failed to delete account. Please try again.");

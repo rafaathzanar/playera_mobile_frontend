@@ -19,7 +19,7 @@ const defaultProfilePic = require("../../assets/dp.jpeg");
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { user: authUser } = useAuth();
+  const { user: authUser, updateUserProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [formData, setFormData] = useState({
@@ -90,7 +90,7 @@ export default function EditProfileScreen() {
       };
 
       console.log("Updating profile with data:", updateData);
-      await api.updateUserProfile(updateData);
+      await updateUserProfile(updateData);
       
       Alert.alert("Success", "Profile updated successfully", [
         {
