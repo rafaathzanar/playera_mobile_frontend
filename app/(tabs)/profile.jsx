@@ -169,26 +169,54 @@ import {
   StyleSheet,
   Platform,
   Alert,
-  AsyncStorage,
+  ActivityIndicator,
 } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import Modal from "react-native-modal";
-import EditProfile from "../profile/edit";
-// import ChangePassword from "../profile/change-password";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { useAuth } from "../../contexts/AuthContext";
+import api from "../../services/api";
 
-// Importing local image
-const profilePic = require("../../assets/dp.jpeg");
+// Importing local image as fallback
+const defaultProfilePic = require("../../assets/dp.jpeg");
 
 const ProfileScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
+  const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState({
-    name: "Rafath Zanar",
-    email: "Contact: 0775145132",
-    profilePicture: profilePic,
+    name: "",
+    email: "",
+    phone: "",
+    profileImage: null,
   });
   const [isModalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  // Load user profile on component mount
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      setIsLoadingProfile(true);
+      const profileData = await api.getUserProfile();
+      console.log("Profile data received:", profileData);
+      
+      setUser({
+        name: profileData.name || "",
+        email: profileData.email || "",
+        phone: profileData.phone || "",
+        profileImage: profileData.profileImage || null,
+      });
+    } catch (error) {
+      console.error("Error loading profile:", error);
+      Alert.alert("Error", "Failed to load profile data");
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
 
   const toggleModal = () => {
     console.log("Toggling modal, current state:", isModalVisible);
@@ -210,13 +238,9 @@ const ProfileScreen = () => {
           onPress: async () => {
             setIsLoading(true);
             try {
-              // Clear user data from AsyncStorage
-              await AsyncStorage.removeItem("userToken");
-              // Navigate to login screen
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Login" }],
-              });
+              await api.logout();
+              logout();
+              router.replace("/auth/sign-in");
             } catch (error) {
               console.error("Logout error:", error);
               Alert.alert("Error", "Failed to log out. Please try again.");
@@ -230,90 +254,102 @@ const ProfileScreen = () => {
     );
   };
 
-  const clearCache = async () => {
-    setIsLoading(true);
-    try {
-      await AsyncStorage.clear();
-      Alert.alert("Success", "Cache cleared successfully");
-    } catch (error) {
-      console.error("Cache clear error:", error);
-      Alert.alert("Error", "Failed to clear cache");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              await api.deleteAccount();
+              Alert.alert("Success", "Account deleted successfully");
+              logout();
+              router.replace("/auth/sign-in");
+            } catch (error) {
+              console.error("Delete account error:", error);
+              Alert.alert("Error", "Failed to delete account. Please try again.");
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleEditProfile = () => {
+    router.push("/profile/edit");
+  };
+
+  const handleBookingHistory = () => {
+    router.push("/profile/booking-history");
+  };
+
+  const handleChangePassword = () => {
+    router.push("/profile/change-password");
   };
 
   const menuItems = [
     {
       items: [
         {
-          icon: "heart-outline",
-          label: "Favourite Venues",
-          action: () => navigation.navigate("profile/favourites"),
-        },
-        {
           icon: "history",
           label: "Booking History",
-          action: () => navigation.navigate("profile/booking-history"),
-        },
-        {
-          icon: "web",
-          label: "Language",
-          action: () => navigation.navigate("LanguageSettings"),
-        },
-        {
-          icon: "weather-night",
-          label: "Darkmode",
-          action: () => navigation.navigate("ThemeSettings"),
+          action: handleBookingHistory,
         },
         {
           icon: "lock",
           label: "Change Password",
-         action: () => navigation.navigate("profile/change-password"), // Relative to profile tab
-        },
-        {
-          icon: "delete",
-          label: "Clear History",
-          action: () => navigation.navigate("ClearHistory"),
+          action: handleChangePassword,
         },
         {
           icon: "account-remove",
           label: "Delete Account",
           color: "#FF4B00",
-          action: () => navigation.navigate("DeleteAccount"),
+          action: handleDeleteAccount,
         },
       ],
     },
   ];
 
+  if (isLoadingProfile) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#FF4B00" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialCommunityIcons name="arrow-left" style={styles.backIcon} />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate("Settings")}
-        >
-          <MaterialCommunityIcons name="dots-vertical" style={styles.settingsIcon} />
-        </TouchableOpacity>
       </View>
 
       {/* Profile Section */}
       <View style={styles.profileSection}>
-        <Image source={user.profilePicture} style={styles.profileImage} />
+        <Image 
+          source={user.profileImage ? { uri: user.profileImage } : defaultProfilePic} 
+          style={styles.profileImage} 
+        />
         <View style={styles.profileInfo}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={styles.name}>{user.name || "User"}</Text>
+          <Text style={styles.email}>{user.email || ""}</Text>
+          {user.phone && <Text style={styles.phone}>{user.phone}</Text>}
           <TouchableOpacity
             style={[styles.editButton, isLoading && styles.disabledButton]}
-            onPress={toggleModal}
+            onPress={handleEditProfile}
             disabled={isLoading}
           >
             <Text style={styles.editText}>Edit Profile</Text>
@@ -362,26 +398,6 @@ const ProfileScreen = () => {
         </Text>
       </TouchableOpacity>
 
-      {/* Edit Profile Modal */}
-      <Modal
-        isVisible={isModalVisible}
-        onBackdropPress={toggleModal}
-        onBackButtonPress={toggleModal}
-        style={styles.bottomModal}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-        backdropOpacity={0.5}
-        avoidKeyboard={true}
-      >
-        <View style={styles.modalContent}>
-          <EditProfile
-            isVisible={isModalVisible}
-            onClose={toggleModal}
-            user={user}
-            setUser={setUser}
-          />
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -392,30 +408,25 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: 20,
   },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
     marginTop: Platform.OS === "ios" ? 30 : 30,
   },
-  backButton: {
-    padding: 10,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: "#000",
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
-  },
-  settingsButton: {
-    padding: 10,
-  },
-  settingsIcon: {
-    fontSize: 20,
-    color: "#000",
   },
   profileSection: {
     flexDirection: "row",
@@ -443,6 +454,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   email: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 5,
+  },
+  phone: {
     fontSize: 14,
     color: "#666",
     marginBottom: 10,
@@ -516,17 +532,6 @@ const styles = StyleSheet.create({
   },
   disabledIcon: {
     color: "#FFB299",
-  },
-  bottomModal: {
-    justifyContent: "flex-end",
-    margin: 0,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    minHeight: 600,
   },
 });
 

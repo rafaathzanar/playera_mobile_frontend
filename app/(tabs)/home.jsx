@@ -10,7 +10,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("football");
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [venues, setVenues] = useState([]);
   const [favoriteVenues, setFavoriteVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +70,11 @@ export default function HomeScreen() {
         if (venuesData.length > 0) {
           console.log("First venue object:", venuesData[0]);
           console.log("Available fields:", Object.keys(venuesData[0]));
+          console.log("Courts data:", venuesData[0].courts);
+          if (venuesData[0].courts && Array.isArray(venuesData[0].courts)) {
+            console.log("First court object:", venuesData[0].courts[0]);
+            console.log("Court fields:", venuesData[0].courts[0] ? Object.keys(venuesData[0].courts[0]) : 'No courts');
+          }
         }
       } else {
         console.error("Venues data is not an array:", venuesData);
@@ -154,34 +159,36 @@ export default function HomeScreen() {
     );
   };
 
-  // Filter venues by category
+  // Filter venues by court type category
   const getVenuesByCategory = (category) => {
     if (!venues.length) return [];
     
-    switch (category) {
-      case 'football':
-        return venues.filter(venue => 
-          venue.venueType?.toLowerCase().includes('outdoor') || 
-          venue.description?.toLowerCase().includes('football') ||
-          venue.description?.toLowerCase().includes('futsal')
-        );
-      case 'shuttle':
-        return venues.filter(venue => 
-          venue.venueType?.toLowerCase().includes('indoor') || 
-          venue.description?.toLowerCase().includes('badminton') || 
-          venue.description?.toLowerCase().includes('shuttle')
-        );
-      case 'tennis':
-        return venues.filter(venue => 
-          venue.description?.toLowerCase().includes('tennis')
-        );
-      case 'cricket':
-        return venues.filter(venue => 
-          venue.description?.toLowerCase().includes('cricket')
-        );
-      default:
-        return venues;
-    }
+    console.log(`Filtering venues by category: ${category}`);
+    console.log(`Total venues: ${venues.length}`);
+    
+    // Filter venues that have courts of the selected type
+    const filteredVenues = venues.filter(venue => {
+      if (!venue.courts || !Array.isArray(venue.courts)) {
+        console.log(`Venue ${venue.name} has no courts data`);
+        return false;
+      }
+      
+      const hasMatchingCourt = venue.courts.some(court => {
+        const courtType = court.type?.toLowerCase();
+        const sportType = court.sportType?.toLowerCase();
+        const categoryLower = category.toLowerCase();
+        
+        console.log(`Court ${court.name || court.courtName}: type=${courtType}, sportType=${sportType}, category=${categoryLower}`);
+        
+        return (courtType === categoryLower) || (sportType === categoryLower);
+      });
+      
+      console.log(`Venue ${venue.name} has matching court: ${hasMatchingCourt}`);
+      return hasMatchingCourt;
+    });
+    
+    console.log(`Filtered venues count: ${filteredVenues.length}`);
+    return filteredVenues;
   };
 
   const filteredFavoriteVenues = filterVenues(favoriteVenues);
@@ -191,27 +198,39 @@ export default function HomeScreen() {
 
   const categories = [
     {
-      name: "football",
+      name: "BASKETBALL",
+      label: "Basketball",
+      icon: "basketball",
+      iconType: "ionicon",
+    },
+    {
+      name: "FOOTBALL",
       label: "Football",
       icon: "football",
       iconType: "ionicon",
     },
     {
-      name: "shuttle",
-      label: "Shuttle",
+      name: "BADMINTON",
+      label: "Badminton",
       icon: "tennisball",
       iconType: "ionicon",
     },
     {
-      name: "tennis",
+      name: "TENNIS",
       label: "Tennis",
       icon: "tennisball",
       iconType: "ionicon",
     },
     {
-      name: "cricket",
+      name: "CRICKET",
       label: "Cricket",
       icon: "baseball",
+      iconType: "ionicon",
+    },
+    {
+      name: "MULTI_SPORT",
+      label: "Multi-Sport",
+      icon: "fitness",
       iconType: "ionicon",
     },
   ];
@@ -283,7 +302,7 @@ export default function HomeScreen() {
         {/* Picked For You Section with Category Buttons */}
         <View className="mt-4 px-4">
           <Text className="text-lg font-bold text-gray-600 mt-3 mb-4">
-            PICKED FOR YOU
+            COURT TYPES
           </Text>
           <View className="flex-row justify-between items-center mb-4">
             {categories.map((category) => (
@@ -361,8 +380,8 @@ export default function HomeScreen() {
             ) : (
               <Text className="text-gray-600">
                 {selectedCategory
-                  ? "No venues available for this category."
-                  : "Select a category to view venues."}
+                  ? "No venues available for this court type."
+                  : "All venues are shown. Select a court type to filter."}
               </Text>
             )}
           </ScrollView>

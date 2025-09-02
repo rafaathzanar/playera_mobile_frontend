@@ -458,6 +458,12 @@ class ApiService {
     });
   }
 
+  async deleteAccount() {
+    return await this.request("/users/profile", {
+      method: "DELETE",
+    });
+  }
+
   // Logout
   async logout() {
     await this.removeAuthToken();
