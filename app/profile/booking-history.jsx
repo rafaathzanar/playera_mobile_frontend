@@ -75,16 +75,23 @@ export default function BookingHistoryScreen() {
 
   const formatTime = (timeString) => {
     if (!timeString) return "N/A";
-    try {
-      const time = new Date(`2000-01-01T${timeString}`);
-      return time.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } catch (error) {
+    
+    // Handle LocalTime format from backend (HH:MM:SS)
+    if (typeof timeString === 'string' && timeString.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      return timeString.substring(0, 5); // "06:00:00" -> "06:00"
+    }
+    
+    // If it's already in HH:MM format, return as is
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 2) {
       return timeString;
     }
+    
+    // If it's in HH:MM:SS format, remove seconds
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 3) {
+      return timeString.substring(0, 5); // Remove seconds
+    }
+    
+    return timeString;
   };
 
   const getStatusColor = (status) => {
@@ -151,16 +158,16 @@ export default function BookingHistoryScreen() {
               <View key={booking.bookingId || index} style={styles.bookingCard}>
                 <View style={styles.bookingHeader}>
                   <Text style={styles.venueName}>
-                    {booking.venue?.name || "Unknown Venue"}
+                    {booking.venueName || "Unknown Venue"}
                   </Text>
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: getStatusColor(booking.status) },
+                      { backgroundColor: getStatusColor(booking.bookingStatus || booking.status) },
                     ]}
                   >
                     <Text style={styles.statusText}>
-                      {getStatusText(booking.status)}
+                      {getStatusText(booking.bookingStatus || booking.status)}
                     </Text>
                   </View>
                 </View>
@@ -169,22 +176,33 @@ export default function BookingHistoryScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Court:</Text>
                     <Text style={styles.detailValue}>
-                      {booking.court?.courtName || "Unknown Court"}
+                      {booking.courtName || "Unknown Court"}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date:</Text>
                     <Text style={styles.detailValue}>
-                      {formatDate(booking.bookingDate)}
+                      {formatDate(booking.bookingDate || booking.date)}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Time:</Text>
-                    <Text style={styles.detailValue}>
-                      {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                    </Text>
+                    <View style={styles.detailValue}>
+                      {booking.timeSlotRanges && booking.timeSlotRanges.length > 0 ? (
+                        booking.timeSlotRanges.map((range, index) => (
+                          <Text key={index} style={styles.detailValue}>
+                            {formatTime(range.startTime)} - {formatTime(range.endTime)}
+                            {index < booking.timeSlotRanges.length - 1 && '\n'}
+                          </Text>
+                        ))
+                      ) : (
+                        <Text style={styles.detailValue}>
+                          {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                        </Text>
+                      )}
+                    </View>
                   </View>
 
                   <View style={styles.detailRow}>
@@ -197,14 +215,14 @@ export default function BookingHistoryScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Total Amount:</Text>
                     <Text style={[styles.detailValue, styles.amountText]}>
-                      LKR {booking.totalAmount || "0.00"}
+                      LKR {booking.totalCost || booking.totalAmount || "0.00"}
                     </Text>
                   </View>
 
-                  {booking.notes && (
+                  {(booking.specialRequests || booking.notes) && (
                     <View style={styles.notesContainer}>
                       <Text style={styles.detailLabel}>Notes:</Text>
-                      <Text style={styles.notesText}>{booking.notes}</Text>
+                      <Text style={styles.notesText}>{booking.specialRequests || booking.notes}</Text>
                     </View>
                   )}
                 </View>
@@ -214,7 +232,7 @@ export default function BookingHistoryScreen() {
                     Booking ID: {booking.bookingId || "N/A"}
                   </Text>
                   <Text style={styles.createdAt}>
-                    Booked on: {formatDate(booking.createdAt)}
+                    Booked on: {formatDate(booking.createdAt || booking.bookingDate || booking.date)}
                   </Text>
                 </View>
               </View>

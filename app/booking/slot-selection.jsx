@@ -99,7 +99,19 @@ export default function SlotSelection() {
       
       // Use the real time slot API
       const availableSlots = await api.getAvailableTimeSlots(courtId, date);
+      console.log('=== BACKEND SLOTS DEBUG ===');
       console.log('Available slots from API:', availableSlots);
+      if (availableSlots && availableSlots.length > 0) {
+        console.log('First few slots:');
+        availableSlots.slice(0, 3).forEach((slot, index) => {
+          console.log(`Slot ${index + 1}:`, {
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            time: `${slot.startTime} - ${slot.endTime}`
+          });
+        });
+      }
+      console.log('=== END BACKEND SLOTS DEBUG ===');
       
       if (availableSlots && Array.isArray(availableSlots)) {
         // Transform the API response to match our format
@@ -148,6 +160,49 @@ export default function SlotSelection() {
     setSelectedDate(dateString);
     setSelectedSlots([]); // Reset selected slots when date changes
     fetchAvailableSlots(dateString);
+  };
+
+  // Group selected slots by time ranges (consecutive vs discontinuous)
+  const groupSlotsByTimeRanges = (slots) => {
+    if (!slots || slots.length === 0) return [];
+    
+    const sortedSlots = [...slots].sort((a, b) => 
+      a.startTime.localeCompare(b.startTime)
+    );
+    
+    const ranges = [];
+    let currentRange = null;
+    
+    sortedSlots.forEach(slot => {
+      if (!currentRange) {
+        currentRange = {
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slots: [slot],
+          duration: 0.5 // Assuming 30-minute slots
+        };
+      } else if (slot.startTime === currentRange.endTime) {
+        // Consecutive slot - extend current range
+        currentRange.endTime = slot.endTime;
+        currentRange.slots.push(slot);
+        currentRange.duration += 0.5;
+      } else {
+        // Non-consecutive slot - start new range
+        ranges.push(currentRange);
+        currentRange = {
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slots: [slot],
+          duration: 0.5
+        };
+      }
+    });
+    
+    if (currentRange) {
+      ranges.push(currentRange);
+    }
+    
+    return ranges;
   };
 
   // Toggle slot selection
@@ -236,14 +291,36 @@ export default function SlotSelection() {
       date: selectedDate
     }));
 
+    // Prepare time slot ranges for discontinuous booking
+    const timeSlotRanges = groupSlotsByTimeRanges(selectedSlots).map(range => ({
+      startTime: range.startTime,
+      endTime: range.endTime,
+      duration: range.duration
+    }));
+
+    // Debug logging
+    console.log('=== SLOT SELECTION DEBUG ===');
+    console.log('Selected slots:', selectedSlots);
+    console.log('Grouped ranges:', groupSlotsByTimeRanges(selectedSlots));
+    console.log('Time slot ranges to pass:', timeSlotRanges);
+    console.log('startTime (first slot):', selectedSlots[0].startTime);
+    console.log('endTime (last slot):', selectedSlots[selectedSlots.length - 1].endTime);
+    
+    // Debug individual time values
+    if (timeSlotRanges.length > 0) {
+      console.log('First range startTime:', timeSlotRanges[0].startTime, 'Type:', typeof timeSlotRanges[0].startTime);
+      console.log('First range endTime:', timeSlotRanges[0].endTime, 'Type:', typeof timeSlotRanges[0].endTime);
+    }
+    console.log('=== END DEBUG ===');
+
     router.push({
       pathname: "/booking/order-summary",
       params: {
         venueId,
         courtId,
         selectedDate,
-        startTime: selectedSlots[0].startTime,
-        endTime: selectedSlots[selectedSlots.length - 1].endTime,
+        startTime: timeSlotRanges.length > 0 ? timeSlotRanges[0].startTime : selectedSlots[0].startTime,
+        endTime: timeSlotRanges.length > 0 ? timeSlotRanges[0].endTime : selectedSlots[selectedSlots.length - 1].endTime,
         totalDuration,
         totalCost,
         courtCost, // Pass court cost separately
@@ -251,6 +328,7 @@ export default function SlotSelection() {
         courtName: court?.courtName,
         venueName: venue?.name,
         selectedSlots: JSON.stringify(slotData),
+        timeSlotRanges: JSON.stringify(timeSlotRanges), // NEW: Pass time slot ranges
         selectedEquipment: JSON.stringify(selectedEquipmentData),
         customerId: user?.userId
       }
@@ -323,8 +401,8 @@ export default function SlotSelection() {
                       selectedSlots.find(s => s.id === slot.id)
                         ? 'border-orange-500 bg-orange-100'
                         : slot.available
-                        ? 'border-gray-300 bg-white'
-                        : 'border-gray-200 bg-gray-100'
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300 bg-gray-100'
                     }`}
                     disabled={!slot.available}
                   >
@@ -333,7 +411,7 @@ export default function SlotSelection() {
                         selectedSlots.find(s => s.id === slot.id)
                           ? 'text-orange-800'
                           : slot.available
-                          ? 'text-gray-800'
+                          ? 'text-green-800'
                           : 'text-gray-500'
                       }`}
                     >
@@ -344,8 +422,8 @@ export default function SlotSelection() {
                         selectedSlots.find(s => s.id === slot.id)
                           ? 'text-orange-600'
                           : slot.available
-                          ? 'text-gray-600'
-                          : 'text-gray-400'
+                          ? 'text-green-600'
+                          : 'text-gray-500'
                       }`}
                     >
                       {slot.available ? 'Available' : slot.status}
@@ -356,6 +434,39 @@ export default function SlotSelection() {
             ) : (
               <View className="py-8">
                 <Text className="text-center text-gray-500">No slots available for this date</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Selected Time Ranges Display */}
+        {selectedSlots.length > 0 && (
+          <View className="p-4 bg-blue-50 rounded-lg mx-4 mb-4">
+            <Text className="text-lg font-semibold text-blue-800 mb-3">Selected Time Ranges</Text>
+            {groupSlotsByTimeRanges(selectedSlots).map((range, index) => (
+              <View key={index} className="bg-white p-3 rounded-lg mb-2 border border-blue-200">
+                <View className="flex-row justify-between items-center">
+                  <View>
+                    <Text className="font-medium text-gray-800">
+                      Range {index + 1}: {range.startTime} - {range.endTime}
+                    </Text>
+                    <Text className="text-sm text-gray-600">
+                      {range.slots.length} slot{range.slots.length > 1 ? 's' : ''} • {range.duration} hour{range.duration > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <View className="bg-blue-100 px-2 py-1 rounded">
+                    <Text className="text-xs text-blue-700 font-medium">
+                      {range.slots.length === 1 ? 'Single' : 'Consecutive'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+            {groupSlotsByTimeRanges(selectedSlots).length > 1 && (
+              <View className="mt-2 p-2 bg-yellow-100 rounded">
+                <Text className="text-sm text-yellow-800 text-center">
+                  📅 Multiple time ranges selected - Discontinuous booking
+                </Text>
               </View>
             )}
           </View>

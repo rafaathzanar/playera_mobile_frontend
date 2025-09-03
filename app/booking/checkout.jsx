@@ -22,6 +22,21 @@ export default function Checkout() {
   const navigation = useNavigation();
   const { user } = useAuth();
 
+  // Parse time slot ranges if available (for discontinuous slots)
+  const timeSlotRanges = (() => {
+    try {
+      console.log('=== CHECKOUT PARSING DEBUG ===');
+      console.log('Raw params.timeSlotRanges:', params.timeSlotRanges);
+      const parsed = params.timeSlotRanges ? JSON.parse(params.timeSlotRanges) : null;
+      console.log('Parsed timeSlotRanges:', parsed);
+      console.log('=== END CHECKOUT PARSING DEBUG ===');
+      return parsed;
+    } catch (error) {
+      console.error('Error parsing timeSlotRanges:', error);
+      return null;
+    }
+  })();
+
   // Parse the data from params
   const [bookingData, setBookingData] = useState({
     venueId: params.venueId,
@@ -52,7 +67,8 @@ export default function Checkout() {
       }
     })(),
     customerId: params.customerId,
-    specialRequests: params.specialRequests || ''
+    specialRequests: params.specialRequests || '',
+    timeSlotRanges: timeSlotRanges || []
   });
 
   const [loading, setLoading] = useState(false);
@@ -77,39 +93,45 @@ export default function Checkout() {
     try {
       setLoading(true);
 
+      // Use the already parsed time slot ranges
+
       // Prepare the booking request in the format expected by the backend
       const bookingRequest = {
         customerId: parseInt(bookingData.customerId),
         bookingDate: bookingData.selectedDate, // Should be in YYYY-MM-DD format
         startTime: bookingData.startTime, // Should be in HH:MM:SS format
         endTime: bookingData.endTime, // Should be in HH:MM:SS format
-        duration: parseInt(bookingData.totalDuration), // Must be integer
+        duration: Math.round(bookingData.totalDuration), // Must be integer, round to handle decimal durations
         specialRequests: bookingData.specialRequests || "",
         // Court bookings
         courtBookings: [{
           courtId: parseInt(bookingData.courtId),
-          timeDuration: parseInt(bookingData.totalDuration)
+          timeDuration: Math.round(bookingData.totalDuration) // Ensure integer for validation
         }],
         // Equipment bookings
         equipmentBookings: bookingData.selectedEquipment && bookingData.selectedEquipment.length > 0 
           ? bookingData.selectedEquipment.map(equipment => ({
               equipmentId: parseInt(equipment.id),
               quantity: parseInt(equipment.quantity),
-              timeDuration: parseInt(bookingData.totalDuration)
+              timeDuration: Math.round(bookingData.totalDuration)
             }))
-          : []
+          : [],
+        // NEW: Time slot ranges for discontinuous booking
+        timeSlotRanges: timeSlotRanges || []
       };
 
       console.log('Creating booking with data:', bookingRequest);
       console.log('Current user:', user);
       console.log('User ID:', user?.userId);
       console.log('Customer ID in request:', bookingRequest.customerId);
+      console.log('Time Slot Ranges:', timeSlotRanges);
       console.log('Raw booking data from params:', {
         selectedDate: bookingData.selectedDate,
         startTime: bookingData.startTime,
         endTime: bookingData.endTime,
         totalDuration: bookingData.totalDuration,
-        customerId: bookingData.customerId
+        customerId: bookingData.customerId,
+        timeSlotRanges: params.timeSlotRanges
       });
 
       // Validate required fields
@@ -125,6 +147,33 @@ export default function Checkout() {
         return;
       }
 
+      // Check token status before creating booking
+      const token = await api.getAuthToken();
+      console.log('Current token:', token ? 'Present' : 'Missing');
+      if (token) {
+        console.log('Token preview:', token.substring(0, 20) + '...');
+      }
+      
+      // Test token validity by making a simple API call
+      try {
+        console.log('Testing token validity...');
+        await api.getUserProfile();
+        console.log('Token is valid');
+      } catch (error) {
+        console.error('Token validation failed:', error);
+        Alert.alert(
+          'Session Expired', 
+          'Your session has expired. Please log in again to continue.',
+          [
+            { text: 'OK', onPress: () => {
+              router.replace('/(auth)/sign-in');
+            }}
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+      
       // Create the booking
       const createdBookingResponse = await api.createBooking(bookingRequest);
       console.log('Booking created:', createdBookingResponse);
@@ -160,10 +209,25 @@ export default function Checkout() {
 
     } catch (error) {
       console.error('Error creating booking:', error);
-      Alert.alert(
-        'Booking Failed', 
-        error.message || 'Failed to create booking. Please try again.'
-      );
+      
+      // Check if it's a 403 error (likely token expired)
+      if (error.message && error.message.includes('403')) {
+        Alert.alert(
+          'Session Expired', 
+          'Your session has expired. Please log in again to continue.',
+          [
+            { text: 'OK', onPress: () => {
+              // Navigate to login
+              router.replace('/(auth)/sign-in');
+            }}
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Booking Failed', 
+          error.message || 'Failed to create booking. Please try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -184,6 +248,34 @@ export default function Checkout() {
   };
 
   const formatTime = (timeString) => {
+    if (!timeString) return '';
+    
+    console.log('=== FORMAT TIME DEBUG ===');
+    console.log('Input timeString:', timeString);
+    console.log('Type:', typeof timeString);
+    console.log('Length:', timeString.length);
+    
+    // Handle LocalTime format from backend (HH:MM:SS)
+    if (typeof timeString === 'string' && timeString.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      const formatted = timeString.substring(0, 5); // "06:00:00" -> "06:00"
+      console.log('LocalTime format (HH:MM:SS), returning:', formatted);
+      return formatted;
+    }
+    
+    // If it's already in HH:MM format, return as is
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 2) {
+      console.log('Already HH:MM format, returning:', timeString);
+      return timeString;
+    }
+    
+    // If it's in HH:MM:SS format, remove seconds
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 3) {
+      const formatted = timeString.substring(0, 5);
+      console.log('HH:MM:SS format, returning:', formatted);
+      return formatted;
+    }
+    
+    console.log('No format match, returning original:', timeString);
     return timeString;
   };
 
@@ -225,9 +317,33 @@ export default function Checkout() {
                 </View>
                 <View className="flex-row justify-between">
                   <Text className="text-gray-600">Time:</Text>
-                  <Text className="font-medium">
-                    {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
-                  </Text>
+                  <View className="flex-1 items-end">
+                    {(() => {
+                      console.log('=== CHECKOUT TIME DISPLAY DEBUG ===');
+                      console.log('bookingData.timeSlotRanges:', bookingData.timeSlotRanges);
+                      console.log('timeSlotRanges length:', bookingData.timeSlotRanges?.length);
+                      console.log('condition result:', bookingData.timeSlotRanges && bookingData.timeSlotRanges.length > 0);
+                      console.log('=== END CHECKOUT TIME DISPLAY DEBUG ===');
+                      
+                      return bookingData.timeSlotRanges && bookingData.timeSlotRanges.length > 0 ? (
+                        <View className="items-end">
+                          <Text className="text-xs text-green-600 mb-1">✓ Individual Ranges ({bookingData.timeSlotRanges.length})</Text>
+                          {bookingData.timeSlotRanges.map((range, index) => (
+                            <Text key={`checkout-range-${index}`} className="font-medium text-right">
+                              {formatTime(range.startTime)} - {formatTime(range.endTime)}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : (
+                        <View className="items-end">
+                          <Text className="text-xs text-orange-600 mb-1">⚠ Overall Span</Text>
+                          <Text className="font-medium">
+                            {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </View>
                 </View>
                 <View className="flex-row justify-between">
                   <Text className="text-gray-600">Total Cost:</Text>

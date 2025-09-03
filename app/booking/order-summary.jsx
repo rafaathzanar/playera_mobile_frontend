@@ -36,12 +36,57 @@ export default function OrderSummary() {
     courtName: params.courtName,
     venueName: params.venueName,
     selectedSlots: JSON.parse(params.selectedSlots || '[]'),
+    timeSlotRanges: JSON.parse(params.timeSlotRanges || '[]'), // NEW: Parse time slot ranges
     selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
     customerId: params.customerId
   });
 
+  // Update the state when params change
+  useEffect(() => {
+    console.log('=== PARAMS CHANGE DETECTED ===');
+    console.log('New params:', params);
+    setBookingData({
+      venueId: params.venueId,
+      courtId: params.courtId,
+      selectedDate: params.selectedDate,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      totalDuration: parseFloat(params.totalDuration),
+      totalCost: parseFloat(params.totalCost),
+      courtCost: parseFloat(params.courtCost) || 0,
+      equipmentCost: parseFloat(params.equipmentCost) || 0,
+      courtName: params.courtName,
+      venueName: params.venueName,
+      selectedSlots: JSON.parse(params.selectedSlots || '[]'),
+      timeSlotRanges: JSON.parse(params.timeSlotRanges || '[]'),
+      selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
+      customerId: params.customerId
+    });
+    // Force re-render when timeSlotRanges change
+    setRenderKey(prev => prev + 1);
+  }, [params.venueId, params.courtId, params.selectedDate, params.startTime, params.endTime, params.timeSlotRanges]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('=== ORDER SUMMARY DEBUG ===');
+    console.log('Raw params.timeSlotRanges:', params.timeSlotRanges);
+    console.log('Parsed timeSlotRanges:', bookingData.timeSlotRanges);
+    console.log('startTime:', bookingData.startTime);
+    console.log('endTime:', bookingData.endTime);
+    console.log('timeSlotRanges length:', bookingData.timeSlotRanges?.length);
+    console.log('timeSlotRanges condition:', bookingData.timeSlotRanges && bookingData.timeSlotRanges.length > 0);
+    console.log('=== END DEBUG ===');
+  }, [bookingData]);
+
+  // Component render debug
+  console.log('=== COMPONENT RENDER ===');
+  console.log('Current bookingData.timeSlotRanges:', bookingData.timeSlotRanges);
+  console.log('Current bookingData.timeSlotRanges length:', bookingData.timeSlotRanges?.length);
+  console.log('=== END COMPONENT RENDER ===');
+
   const [specialRequests, setSpecialRequests] = useState("");
   const [loading, setLoading] = useState(false);
+  const [renderKey, setRenderKey] = useState(0);
 
   // Calculate total cost (already calculated in slot selection)
   const calculateTotalCost = () => {
@@ -80,6 +125,7 @@ export default function OrderSummary() {
         courtName: bookingData.courtName,
         venueName: bookingData.venueName,
         selectedSlots: JSON.stringify(bookingData.selectedSlots),
+        timeSlotRanges: JSON.stringify(bookingData.timeSlotRanges), // Pass time slot ranges to checkout
         selectedEquipment: JSON.stringify(bookingData.selectedEquipment),
         customerId: user.userId,
         specialRequests: specialRequests
@@ -102,6 +148,34 @@ export default function OrderSummary() {
   };
 
   const formatTime = (timeString) => {
+    if (!timeString) return '';
+    
+    console.log('=== ORDER SUMMARY FORMAT TIME DEBUG ===');
+    console.log('Input timeString:', timeString);
+    console.log('Type:', typeof timeString);
+    console.log('Length:', timeString.length);
+    
+    // Handle LocalTime format from backend (HH:MM:SS)
+    if (typeof timeString === 'string' && timeString.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      const formatted = timeString.substring(0, 5); // "06:00:00" -> "06:00"
+      console.log('LocalTime format (HH:MM:SS), returning:', formatted);
+      return formatted;
+    }
+    
+    // If it's already in HH:MM format, return as is
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 2) {
+      console.log('Already HH:MM format, returning:', timeString);
+      return timeString;
+    }
+    
+    // If it's in HH:MM:SS format, remove seconds
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 3) {
+      const formatted = timeString.substring(0, 5);
+      console.log('HH:MM:SS format, returning:', formatted);
+      return formatted;
+    }
+    
+    console.log('No format match, returning original:', timeString);
     return timeString;
   };
 
@@ -114,7 +188,7 @@ export default function OrderSummary() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView key={renderKey} className="flex-1 bg-white">
       <ScrollView>
         {/* Header */}
         <View className="flex-row items-center p-4 bg-orange-500">
@@ -142,13 +216,33 @@ export default function OrderSummary() {
             </View>
             <View className="flex-row justify-between">
               <Text className="text-gray-600">Time:</Text>
-              <Text className="font-medium">
-                {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
-              </Text>
+              <View className="flex-1 items-end">
+                {bookingData.timeSlotRanges && bookingData.timeSlotRanges.length > 0 ? (
+                  <View className="items-end">
+                    <Text className="text-xs text-green-600 mb-1">✓ Individual Ranges ({bookingData.timeSlotRanges.length})</Text>
+                    {bookingData.timeSlotRanges.map((range, index) => (
+                      <Text key={`range-${index}`} className="font-medium text-right">
+                        {formatTime(range.startTime)} - {formatTime(range.endTime)}
+                      </Text>
+                    ))}
+                  </View>
+                ) : (
+                  <View className="items-end">
+                    <Text className="text-xs text-orange-600 mb-1">⚠ Overall Span</Text>
+                    <Text className="font-medium">
+                      {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
             <View className="flex-row justify-between">
               <Text className="text-gray-600">Duration:</Text>
-              <Text className="font-medium">{bookingData.totalDuration} hours</Text>
+              <Text className="font-medium">
+                {bookingData.timeSlotRanges && bookingData.timeSlotRanges.length > 0 
+                  ? bookingData.timeSlotRanges.reduce((total, range) => total + range.duration, 0) 
+                  : bookingData.totalDuration} hours
+              </Text>
             </View>
             <View className="flex-row justify-between">
               <Text className="text-gray-600">Court Cost:</Text>
