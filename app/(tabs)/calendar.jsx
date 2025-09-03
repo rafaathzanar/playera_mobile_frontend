@@ -239,12 +239,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 11,
     color: "#333"
   },
   calendar: { 
     margin: 20,
-    marginTop: -4,
+    marginTop: -12,
     marginBottom: -5,
     padding: 10,   
     borderRadius: 8, 
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   legendContainer: { 
     flexDirection: "row", 
     justifyContent: "space-around", 
-    marginVertical: 20, 
+    marginVertical: 5, 
     paddingHorizontal: 10, 
   },
   legendItem: { 
@@ -267,9 +267,9 @@ const styles = StyleSheet.create({
     marginRight: 5 
   },
   sectionTitle: {
-    fontSize: 18, 
-    fontWeight: "bold", 
-    marginVertical: 10, 
+    fontSize: 14, 
+    fontWeight: "thin", 
+    marginVertical: 5, 
     paddingHorizontal: 10,
     color: "#333"
   },
