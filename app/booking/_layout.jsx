@@ -24,6 +24,13 @@ export default function BookingLayout() {
           title: "Order Summary"
         }} 
       />
+      <Stack.Screen 
+        name="payment" 
+        options={{ 
+          headerShown: false,
+          title: "Payment"
+        }} 
+      />
     </Stack>
   );
 }

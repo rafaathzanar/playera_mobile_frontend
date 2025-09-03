@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,7 +76,7 @@ const PaymentScreen = () => {
       setLoading(true);
       
       const paymentIntentData = {
-        amount: Math.round(bookingData.totalCost * 100), // Convert to cents
+        amount: Math.round(bookingData.totalCost), // Send amount in LKR (backend will convert to cents)
         currency: 'LKR',
         description: `Booking at ${bookingData.venueName} - ${bookingData.courtName}`,
         customerEmail: user?.email || 'customer@example.com',
@@ -85,6 +86,8 @@ const PaymentScreen = () => {
       };
 
       console.log('Creating payment intent with data:', paymentIntentData);
+      console.log('Original total cost:', bookingData.totalCost, 'LKR');
+      console.log('Amount being sent to backend:', paymentIntentData.amount, 'LKR');
       
       const response = await api.createPaymentIntent(paymentIntentData);
 
@@ -276,6 +279,7 @@ const PaymentScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
