@@ -271,26 +271,30 @@ export default function HomeScreen() {
       <ScrollView>
         {/* Favorites Section */}
         <View className="mt-4 px-4">
-          <Text className="text-lg font-bold text-gray-600 mb-2">FAVOURITES</Text>
+          <Text className="text-lg font-bold text-gray-600 mb-4">FAVOURITES</Text>
           {!user?.userId ? (
             <Text className="text-gray-500 text-center py-4">Please login to see your favorite venues</Text>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              style={{ height: 240 }}
+            >
               {filteredFavoriteVenues.length > 0 ? (
                 filteredFavoriteVenues.map((venue) => (
-                  <View key={venue.venueId} className="mr-4">
-                    <VenueCard
-                      onPress={() => router.push(`/venue/${venue.venueId}`)}
-                      name={venue.name}
-                      address={venue.address}
-                      contact={venue.contactNo}
-                      image={getVenueImage(venue)}
-                      isOpen={venue.status === 'ACTIVE'}
-                      closingTime={venue.openingHours || '9 PM'}
-                      isFavorite={favoriteVenues.some((fav) => fav.venueId === venue.venueId)}
-                      onToggleFavorite={() => toggleFavorite(venue)}
-                    />
-                  </View>
+                  <VenueCard
+                    key={venue.venueId}
+                    onPress={() => router.push(`/venue/${venue.venueId}`)}
+                    name={venue.name}
+                    address={venue.address}
+                    image={getVenueImage(venue)}
+                    isOpen={venue.status === 'ACTIVE'}
+                    openingTime={venue.openingHours?.split(' - ')[0] || '6:00 AM'}
+                    closingTime={venue.openingHours?.split(' - ')[1] || '10:00 PM'}
+                    isFavorite={favoriteVenues.some((fav) => fav.venueId === venue.venueId)}
+                    onToggleFavorite={() => toggleFavorite(venue)}
+                  />
                 ))
               ) : (
                 <Text className="text-gray-600">No favorite venues yet.</Text>
@@ -300,8 +304,8 @@ export default function HomeScreen() {
         </View>
 
         {/* Picked For You Section with Category Buttons */}
-        <View className="mt-4 px-4">
-          <Text className="text-lg font-bold text-gray-600 mt-3 mb-4">
+        <View className="-mt-10 px-4">
+          <Text className="text-lg font-bold text-gray-600 mt-0 mb-4">
             COURT TYPES
           </Text>
           <View className="flex-row justify-between items-center mb-4">
@@ -354,28 +358,32 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            style={{ height: 280 }}
+          >
             {filteredPickedVenues.length > 0 ? (
               filteredPickedVenues.map((venue) => (
-                <View key={venue.venueId} className="mr-4">
-                  <VenueCard
-                    onPress={() => router.push(`/venue/${venue.venueId}`)}
-                    name={venue.name}
-                    address={venue.address}
-                    contact={venue.contactNo}
-                    image={getVenueImage(venue)}
-                    isOpen={venue.status === 'ACTIVE'}
-                    closingTime={venue.openingHours || '9 PM'}
-                    isFavorite={user?.userId ? favoriteVenues.some((fav) => fav.venueId === venue.venueId) : false}
-                    onToggleFavorite={() => {
-                      if (user?.userId) {
-                        toggleFavorite(venue);
-                      } else {
-                        Alert.alert('Login Required', 'Please login to add venues to favorites');
-                      }
-                    }}
-                  />
-                </View>
+                <VenueCard
+                  key={venue.venueId}
+                  onPress={() => router.push(`/venue/${venue.venueId}`)}
+                  name={venue.name}
+                  address={venue.address}
+                  image={getVenueImage(venue)}
+                  isOpen={venue.status === 'ACTIVE'}
+                  openingTime={venue.openingHours?.split(' - ')[0] || '6:00 AM'}
+                  closingTime={venue.openingHours?.split(' - ')[1] || '10:00 PM'}
+                  isFavorite={user?.userId ? favoriteVenues.some((fav) => fav.venueId === venue.venueId) : false}
+                  onToggleFavorite={() => {
+                    if (user?.userId) {
+                      toggleFavorite(venue);
+                    } else {
+                      Alert.alert('Login Required', 'Please login to add venues to favorites');
+                    }
+                  }}
+                />
               ))
             ) : (
               <Text className="text-gray-600">
