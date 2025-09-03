@@ -30,6 +30,8 @@ export const AuthProvider = ({ children }) => {
         const userProfile = await api.getUserProfile();
         setUser(userProfile);
         setIsAuthenticated(true);
+        // Store user data for notification service
+        await AsyncStorage.setItem("userData", JSON.stringify(userProfile));
       }
     } catch (error) {
       console.log("No valid token found");
@@ -99,6 +101,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const updatedProfile = await api.updateUserProfile(profileData);
       setUser(updatedProfile);
+      // Store updated user data for notification service
+      await AsyncStorage.setItem("userData", JSON.stringify(updatedProfile));
       return updatedProfile;
     } catch (error) {
       console.error("Profile update error:", error);

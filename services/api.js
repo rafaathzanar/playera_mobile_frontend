@@ -30,6 +30,7 @@ class ApiService {
   async removeAuthToken() {
     try {
       await AsyncStorage.removeItem("authToken");
+      await AsyncStorage.removeItem("userData");
     } catch (error) {
       console.error("Error removing auth token:", error);
     }
@@ -102,6 +103,10 @@ class ApiService {
       await this.setAuthToken(response.token);
     }
 
+    if (response.user) {
+      await AsyncStorage.setItem("userData", JSON.stringify(response.user));
+    }
+
     return response;
   }
 
@@ -113,6 +118,10 @@ class ApiService {
 
     if (response.token) {
       await this.setAuthToken(response.token);
+    }
+
+    if (response.user) {
+      await AsyncStorage.setItem("userData", JSON.stringify(response.user));
     }
 
     return response;
@@ -471,6 +480,7 @@ class ApiService {
   // Logout
   async logout() {
     await this.removeAuthToken();
+    await AsyncStorage.removeItem("userData");
   }
 }
 
