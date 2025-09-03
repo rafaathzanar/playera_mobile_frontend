@@ -145,7 +145,7 @@ export default function CalendarScreen() {
         {selectedDate ? `Bookings on ${selectedDate}` : "Select a date to view bookings"}
       </Text>
 
-      <FlatList
+      <FlatList style={{ flex: 1, marginBottom: 60 }}
         data={bookings.filter((b) => {
           if (!selectedDate) return false;
           const bookingDate = b.bookingDate ? new Date(b.bookingDate).toISOString().split('T')[0] : null;
@@ -269,6 +269,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14, 
     fontWeight: "thin", 
+    marginBottom:10,
     marginVertical: 5, 
     paddingHorizontal: 10,
     color: "#333"
@@ -278,13 +279,14 @@ const styles = StyleSheet.create({
     padding: 20, 
     borderRadius: 16, 
     marginBottom: 16, 
+    margin:10,
     shadowColor: "#000", 
     shadowOpacity: 0.08, 
     shadowRadius: 8, 
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
     borderWidth: 1,
-    borderColor: "#F3F4F6"
+    borderColor: "#e04e29ff"
   },
   cardHeader: {
     flexDirection: "row",

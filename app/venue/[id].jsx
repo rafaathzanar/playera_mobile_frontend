@@ -3,6 +3,7 @@ import { SafeAreaView, View, Text, ScrollView, Image, TouchableOpacity, Alert } 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeftIcon } from 'react-native-heroicons/solid';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 
 export default function VenueDetail() {
@@ -29,7 +30,7 @@ export default function VenueDetail() {
         
         // Fetch courts for this venue
         const courtsData = await api.getCourts(id);
-        setCourts(courtsData);
+        setCourts(courtsData || []);
         
         // Fetch equipment for this venue
         try {
@@ -136,60 +137,96 @@ export default function VenueDetail() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView>
-        {/* Header */}
-        <View>
-          <View className="flex-row items-center p-2" style={{ backgroundColor: '#FF4B00' }}>
-            <TouchableOpacity onPress={() => navigation.goBack()} className="pr-1">
-              <ArrowLeftIcon size={20} color="white" style={{ marginLeft: 15 }} />
-            </TouchableOpacity>
-            <Text className="font-bold text-lg text-white text-center flex-1">
-              VENUE DETAILS
-            </Text>
-            <View style={{ width: 24 }} />
+      
+        {/* Enhanced Venue Banner */}
+        <View className="relative">
+          <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 }}
+            ></TouchableOpacity>
+          <Image 
+            source={{ uri: getVenueImage(venue) }} 
+            className="w-full h-64" 
+            resizeMode="cover" 
+          />
+          <View className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-20" />
+          <View className="absolute bottom-4 left-4 right-4">
+            <Text className="text-white text-3xl font-bold mb-1">{venue.name}</Text>
+            <View className="flex-row items-center">
+              <Ionicons name="location-outline" size={16} color="white" />
+              <Text className="text-white/90 text-sm ml-1">{venue.address}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Venue Banner */}
-        <Image 
-          source={{ uri: getVenueImage(venue) }} 
-          className="w-full h-48" 
-          resizeMode="cover" 
-        />
+        {/* Enhanced Venue Info */}
+        <View className="p-6 bg-white">
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center">
+              <View className="bg-green-100 p-2 rounded-full mr-3">
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              </View>
+              <View>
+                <Text className="text-lg font-semibold text-gray-800">Open Now</Text>
+                <Text className="text-sm text-gray-600">{venue.openingHours || 'Hours not available'}</Text>
+              </View>
+            </View>
+            <View className="bg-blue-100 p-2 rounded-full">
+              <Ionicons name="star" size={20} color="#3B82F6" />
+            </View>
+          </View>
 
-        {/* Venue Info */}
-        <View className="p-4">
-          <Text className="text-2xl font-bold mb-2">{venue.name}</Text>
-          <Text className="text-gray-600">{venue.address}</Text>
-          <Text className="text-gray-600">Contact: {venue.contactNo || 'Not available'}</Text>
-          {venue.openingHours && (
-            <Text className="text-gray-600">Hours: {venue.openingHours}</Text>
-          )}
+          <View className="flex-row items-center mb-4">
+            <View className="bg-orange-100 p-2 rounded-full mr-3">
+              <Ionicons name="call-outline" size={20} color="#F59E0B" />
+            </View>
+            <Text className="text-gray-700">{venue.contactNo || 'Contact not available'}</Text>
+          </View>
+
           {venue.description && (
-            <Text className="mt-2 text-gray-700">{venue.description}</Text>
+            <View className="bg-gray-50 p-4 rounded-xl">
+              <Text className="text-gray-700 leading-6">{venue.description}</Text>
+            </View>
           )}
         </View>
 
-        {/* Courts Listing */}
-        <View className="p-4">
-          <Text style={{ color: '#238AFF' }} className="text-xl font-semibold mb-4">
-            COURTS ({courts.length})
-          </Text>
+        {/* Enhanced Courts Section */}
+        <View className="px-6 py-4">
+          <View className="flex-row items-center mb-6">
+            <View className="bg-blue-100 p-3 rounded-full mr-4">
+              <Ionicons name="basketball-outline" size={24} color="#3B82F6" />
+            </View>
+            <View>
+              <Text className="text-2xl font-bold text-gray-800">Available Courts</Text>
+              <Text className="text-gray-600">{courts?.length || 0} courts available</Text>
+            </View>
+          </View>
 
           {/* Dynamic Pricing Info */}
           {courts.some(court => court.dynamicPricingEnabled) && (
-            <View className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-              <Text className="text-orange-800 text-sm font-medium mb-1">
-                💰 Dynamic Pricing Active
-              </Text>
-              <Text className="text-orange-700 text-xs">
+            <View className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-2xl p-4 mb-6">
+              <View className="flex-row items-center mb-2">
+                <View className="bg-orange-100 p-2 rounded-full mr-3">
+                  <Ionicons name="trending-up" size={16} color="#F59E0B" />
+                </View>
+                <Text className="text-orange-800 text-base font-semibold">
+                  Dynamic Pricing Active
+                </Text>
+              </View>
+              <Text className="text-orange-700 text-sm leading-5">
                 Prices may vary based on time, day, and demand. Peak hours and weekends may have higher rates.
               </Text>
             </View>
           )}
 
-          {courts.length === 0 ? (
-            <View className="bg-gray-100 p-4 rounded-lg">
-              <Text className="text-center text-gray-600">No courts available for this venue</Text>
+          {!courts || courts.length === 0 ? (
+            <View className="bg-gray-50 p-8 rounded-2xl border border-gray-200">
+              <View className="items-center">
+                <View className="bg-gray-200 p-4 rounded-full mb-4">
+                  <Ionicons name="basketball-outline" size={32} color="#9CA3AF" />
+                </View>
+                <Text className="text-center text-gray-600 text-lg">No courts available for this venue</Text>
+              </View>
             </View>
           ) : (
             courts.map((court) => {
@@ -199,82 +236,158 @@ export default function VenueDetail() {
               return (
                 <View
                   key={court.courtId}
-                  className="mb-4 rounded-lg px-4 py-4"
-                  style={{ backgroundColor: '#F1F3F5' }}
+                  style={{
+                    marginBottom: 24,
+                    backgroundColor: 'white',
+                    borderRadius: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 5,
+                    overflow: 'hidden',
+                  }}
                 >
-                  {/* Court Info */}
-                  <View className="flex-row justify-between items-start mb-3">
-                    <View className="flex-1">
-                      <Text className="text-lg font-bold text-gray-800">{court.courtName}</Text>
-                      <Text className="text-gray-600">{court.type}</Text>
-                      <Text className="text-gray-600">{formatPriceWithDynamic(court)}</Text>
-                      {court.surfaceType && (
-                        <Text className="text-gray-600">Surface: {court.surfaceType}</Text>
-                      )}
-                      {court.capacity && (
-                        <Text className="text-gray-600">Capacity: {court.capacity} people</Text>
-                      )}
-                      {court.description && (
-                        <Text className="text-gray-600 text-sm mt-1">{court.description}</Text>
-                      )}
+                  {/* Court Header */}
+                  <View style={{ 
+                    backgroundColor: '#0e0e0ee3', 
+                    padding: 16,
+                    borderTopLeftRadius: 16,
+                    borderTopRightRadius: 16,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginBottom: 4 }}>
+                          {court.courtName}
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+                          {court.type}
+                        </Text>
+                      </View>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 20 }}>
+                        <Ionicons name="basketball" size={24} color="white" />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Court Details */}
+                  <View style={{ padding: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <View style={{ backgroundColor: '#D1FAE5', padding: 4, borderRadius: 20, marginRight: 8 }}>
+                            <Ionicons name="cash-outline" size={16} color="#10B981" />
+                          </View>
+                          <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>{formatPriceWithDynamic(court)}</Text>
+                        </View>
+                        
+                        {court.surfaceType && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={{ backgroundColor: '#DBEAFE', padding: 4, borderRadius: 20, marginRight: 8 }}>
+                              <Ionicons name="layers-outline" size={16} color="#3B82F6" />
+                            </View>
+                            <Text style={{ color: '#6B7280' }}>{court.surfaceType}</Text>
+                          </View>
+                        )}
+                        
+                        {court.capacity && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={{ backgroundColor: '#FED7AA', padding: 4, borderRadius: 20, marginRight: 8 }}>
+                              <Ionicons name="people-outline" size={16} color="#F59E0B" />
+                            </View>
+                            <Text style={{ color: '#6B7280' }}>{court.capacity} people</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
 
-                    <View className="flex-row gap-2 ml-4">
-                      {/* View Button */}
+                    {court.description && (
+                      <View style={{ backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, marginBottom: 16 }}>
+                        <Text style={{ color: '#374151', fontSize: 14, lineHeight: 20 }}>{court.description}</Text>
+                      </View>
+                    )}
+
+                    {/* Action Buttons */}
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
                       <TouchableOpacity
                         onPress={() => handleCourtView(court.courtId)}
                         activeOpacity={0.8}
-                        className="h-10 w-24 rounded-lg bg-white border border-orange-500 justify-center"
+                        style={{ 
+                          flex: 1, 
+                          backgroundColor: 'white', 
+                          borderWidth: 2, 
+                          borderColor: '#3B82F6', 
+                          borderRadius: 12, 
+                          paddingVertical: 12, 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          justifyContent: 'center' 
+                        }}
                       >
-                        <Text className="text-orange-500 font-semibold text-center text-base">
-                          View
-                        </Text>
+                        <Ionicons name="eye-outline" size={18} color="#3B82F6" />
+                        <Text style={{ color: '#3B82F6', fontWeight: '600', marginLeft: 8 }}>View Details</Text>
                       </TouchableOpacity>
 
-                      {/* Book Button */}
                       <TouchableOpacity
                         onPress={() => handleCourtBook(court.courtId)}
                         activeOpacity={0.8}
-                        className="h-10 w-24 rounded-lg bg-orange-500 border border-orange-500 justify-center"
+                        style={{ 
+                          flex: 1, 
+                          backgroundColor: '#3B82F6', 
+                          borderRadius: 12, 
+                          paddingVertical: 12, 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          justifyContent: 'center' 
+                        }}
                       >
-                        <Text className="text-white font-semibold text-center text-base">
-                          Book
-                        </Text>
+                        <Ionicons name="calendar-outline" size={18} color="white" />
+                        <Text style={{ color: 'white', fontWeight: '600', marginLeft: 8 }}>Book Now</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  {/* Equipment Section */}
+                  {/* Enhanced Equipment Section */}
                   {courtEquipment.length > 0 && (
-                    <View className="mt-3 pt-3 border-t border-gray-300">
-                      <Text className="text-sm font-medium text-gray-700 mb-2">
-                        🏀 Available Equipment ({courtEquipment.length})
-                      </Text>
-                      <View className="space-y-2">
+                    <View className="bg-gray-50 p-4">
+                      <View className="flex-row items-center mb-3">
+                        <View className="bg-purple-100 p-2 rounded-full mr-3">
+                          <Ionicons name="fitness-outline" size={16} color="#8B5CF6" />
+                        </View>
+                        <Text className="text-base font-semibold text-gray-800">
+                          Available Equipment ({courtEquipment.length})
+                        </Text>
+                      </View>
+                      <View className="space-y-3">
                         {courtEquipment.map((eq) => (
-                          <View key={eq.equipmentId} className="bg-white rounded-lg p-3 border border-gray-200">
+                          <View key={eq.equipmentId} className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
                             <View className="flex-row justify-between items-start">
                               <View className="flex-1">
-                                <Text className="font-medium text-gray-800">{eq.name}</Text>
+                                <Text className="font-semibold text-gray-800 mb-1">{eq.name}</Text>
                                 {eq.description && (
-                                  <Text className="text-sm text-gray-600">{eq.description}</Text>
+                                  <Text className="text-sm text-gray-600 mb-2">{eq.description}</Text>
                                 )}
-                                <View className="flex-row items-center mt-1">
-                                  <Text className="text-sm text-gray-600">
+                                <View className="flex-row items-center">
+                                  <View className="bg-blue-100 p-1 rounded-full mr-2">
+                                    <Ionicons name="cube-outline" size={12} color="#3B82F6" />
+                                  </View>
+                                  <Text className="text-sm text-gray-600 mr-4">
                                     {eq.availableQuantity}/{eq.totalQuantity} available
                                   </Text>
-                                  <Text className="text-sm text-gray-500 mx-2">•</Text>
+                                  <View className="bg-green-100 p-1 rounded-full mr-2">
+                                    <Ionicons name="cash-outline" size={12} color="#10B981" />
+                                  </View>
                                   <Text className="text-sm text-gray-600">
                                     {formatEquipmentPrice(eq)}
                                   </Text>
                                 </View>
                               </View>
-                              <View className="ml-2">
-                                <View className={`px-2 py-1 rounded-full ${
+                              <View className="ml-3">
+                                <View className={`px-3 py-1 rounded-full ${
                                   eq.status === 'AVAILABLE' ? 'bg-green-100' : 
                                   eq.status === 'MAINTENANCE' ? 'bg-yellow-100' : 'bg-gray-100'
                                 }`}>
-                                  <Text className={`text-xs font-medium ${
+                                  <Text className={`text-xs font-semibold ${
                                     eq.status === 'AVAILABLE' ? 'text-green-800' : 
                                     eq.status === 'MAINTENANCE' ? 'text-yellow-800' : 'text-gray-800'
                                   }`}>
@@ -294,33 +407,50 @@ export default function VenueDetail() {
           )}
         </View>
 
-        {/* Equipment Summary */}
+        {/* Enhanced Equipment Summary */}
         {equipment.length > 0 && (
-          <View className="p-4">
-            <Text style={{ color: '#238AFF' }} className="text-xl font-semibold mb-4">
-              EQUIPMENT RENTAL
-            </Text>
-            <View className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <Text className="text-blue-800 text-sm font-medium mb-2">
-                🎾 Equipment Available for Rent
-              </Text>
-              <Text className="text-blue-700 text-xs">
+          <View className="px-6 py-4">
+            <View className="flex-row items-center mb-4">
+              <View className="bg-purple-100 p-3 rounded-full mr-4">
+                <Ionicons name="fitness" size={24} color="#8B5CF6" />
+              </View>
+              <View>
+                <Text className="text-2xl font-bold text-gray-800">Equipment Rental</Text>
+                <Text className="text-gray-600">Available for all courts</Text>
+              </View>
+            </View>
+            <View className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-2xl p-4">
+              <View className="flex-row items-center mb-2">
+                <View className="bg-purple-100 p-2 rounded-full mr-3">
+                  <Ionicons name="information-circle" size={16} color="#8B5CF6" />
+                </View>
+                <Text className="text-purple-800 text-base font-semibold">
+                  Equipment Available for Rent
+                </Text>
+              </View>
+              <Text className="text-purple-700 text-sm leading-5">
                 All equipment can be added to your court booking. Equipment will be delivered to your court at the start of your session.
               </Text>
             </View>
           </View>
         )}
 
-        {/* Additional Venue Information */}
+        {/* Enhanced Amenities Section */}
         {venue.amenities && venue.amenities.length > 0 && (
-          <View className="p-4">
-            <Text style={{ color: '#238AFF' }} className="text-xl font-semibold mb-4">
-              AMENITIES
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
+          <View className="px-6 py-4">
+            <View className="flex-row items-center mb-4">
+              <View className="bg-green-100 p-3 rounded-full mr-4">
+                <Ionicons name="star" size={24} color="#10B981" />
+              </View>
+              <View>
+                <Text className="text-2xl font-bold text-gray-800">Amenities</Text>
+                <Text className="text-gray-600">What's included</Text>
+              </View>
+            </View>
+            <View className="flex-row flex-wrap gap-3">
               {venue.amenities.map((amenity, index) => (
-                <View key={index} className="bg-orange-100 px-3 py-2 rounded-lg">
-                  <Text className="text-orange-800 text-sm">{amenity}</Text>
+                <View key={index} className="bg-gradient-to-r from-green-100 to-emerald-100 px-4 py-3 rounded-xl border border-green-200">
+                  <Text className="text-green-800 text-sm font-semibold">{amenity}</Text>
                 </View>
               ))}
             </View>
