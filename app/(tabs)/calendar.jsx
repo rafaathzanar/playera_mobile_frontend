@@ -11,6 +11,24 @@ export default function CalendarScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
 
+  // Format time function to handle LocalTime format from backend
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    // Handle LocalTime format from backend (HH:MM:SS)
+    if (typeof timeString === 'string' && timeString.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      return timeString.substring(0, 5); // "06:00:00" -> "06:00"
+    }
+    // If it's already in HH:MM format, return as is
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 2) {
+      return timeString;
+    }
+    // If it's in HH:MM:SS format, remove seconds
+    if (typeof timeString === 'string' && timeString.includes(':') && timeString.split(':').length === 3) {
+      return timeString.substring(0, 5); // Remove seconds
+    }
+    return timeString;
+  };
+
   // Fetch user's bookings
   useEffect(() => {
     if (user?.userId) {
@@ -137,15 +155,48 @@ export default function CalendarScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.venue}>{item.venueName || item.courtName || 'Unknown Venue'}</Text>
+              <View style={styles.venueInfo}>
+                <Text style={styles.venue}>{item.venueName || 'Unknown Venue'}</Text>
+                <Text style={styles.court}>{item.courtName || 'Unknown Court'}</Text>
+              </View>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                 <Text style={styles.statusText}>{item.status || 'UNKNOWN'}</Text>
               </View>
             </View>
-            <Text style={styles.timeSlot}>
-              {item.startTime} - {item.endTime} ({item.duration} hours)
-            </Text>
-            <Text style={styles.cost}>LKR {item.totalCost?.toFixed(2) || '0.00'}</Text>
+            
+            <View style={styles.timeContainer}>
+              <Text style={styles.timeLabel}>Time Slots:</Text>
+              {item.timeSlotRanges && item.timeSlotRanges.length > 0 ? (
+                <View style={styles.timeRangesContainer}>
+                  {item.timeSlotRanges.map((range, index) => (
+                    <View key={index} style={styles.timeRangeItem}>
+                      <Text style={styles.timeRange}>
+                        {formatTime(range.startTime)} - {formatTime(range.endTime)}
+                      </Text>
+                      <Text style={styles.duration}>({range.duration}h)</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.timeRangeItem}>
+                  <Text style={styles.timeRange}>
+                    {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                  </Text>
+                  <Text style={styles.duration}>({item.duration}h)</Text>
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.cardFooter}>
+              <View style={styles.costContainer}>
+                <Text style={styles.costLabel}>Total Cost</Text>
+                <Text style={styles.cost}>LKR {item.totalCost?.toFixed(2) || '0.00'}</Text>
+              </View>
+              <View style={styles.bookingIdContainer}>
+                <Text style={styles.bookingIdLabel}>Booking ID</Text>
+                <Text style={styles.bookingId}>#{item.bookingId}</Text>
+              </View>
+            </View>
           </View>
         )}
         refreshControl={
@@ -224,48 +275,121 @@ const styles = StyleSheet.create({
   },
   card: { 
     backgroundColor: "white", 
-    padding: 15, 
-    borderRadius: 10, 
-    marginBottom: 15, 
+    padding: 20, 
+    borderRadius: 16, 
+    marginBottom: 16, 
     shadowColor: "#000", 
-    shadowOpacity: 0.1, 
-    shadowRadius: 5, 
-    elevation: 3,
+    shadowOpacity: 0.08, 
+    shadowRadius: 8, 
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
     borderWidth: 1,
-    borderColor: "#E5E7EB"
+    borderColor: "#F3F4F6"
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10
+    alignItems: "flex-start",
+    marginBottom: 16
+  },
+  venueInfo: {
+    flex: 1,
+    marginRight: 12
   },
   venue: { 
-    fontSize: 16, 
-    fontWeight: "bold", 
-    color: "#333",
-    flex: 1
+    fontSize: 18, 
+    fontWeight: "700", 
+    color: "#1F2937",
+    marginBottom: 4
+  },
+  court: {
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: "500"
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 10
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2
   },
   statusText: {
     color: "white",
     fontSize: 12,
-    fontWeight: "600"
+    fontWeight: "700",
+    textTransform: "uppercase"
   },
-  timeSlot: { 
-    fontSize: 14, 
-    color: "#666",
-    marginBottom: 5
+  timeContainer: {
+    marginBottom: 16
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8
+  },
+  timeRangesContainer: {
+    gap: 6
+  },
+  timeRangeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF4B00"
+  },
+  timeRange: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1F2937",
+    flex: 1
+  },
+  duration: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500"
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6"
+  },
+  costContainer: {
+    flex: 1
+  },
+  costLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+    marginBottom: 2
   },
   cost: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#FF4B00"
+  },
+  bookingIdContainer: {
+    alignItems: "flex-end"
+  },
+  bookingIdLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+    marginBottom: 2
+  },
+  bookingId: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151"
   },
   emptyContainer: {
     flex: 1,
