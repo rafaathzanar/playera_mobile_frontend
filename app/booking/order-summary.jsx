@@ -103,15 +103,15 @@ export default function OrderSummary() {
     }
   }, [bookingData]);
 
-  const handleProceedToCheckout = () => {
+  const handleProceedToPayment = () => {
     if (!user) {
       Alert.alert("Authentication Required", "Please log in to continue with your booking.");
       return;
     }
 
-    // Navigate to checkout with all the booking data
+    // Navigate to payment screen with all the booking data
     router.push({
-      pathname: "/booking/checkout",
+      pathname: "/booking/payment",
       params: {
         venueId: bookingData.venueId,
         courtId: bookingData.courtId,
@@ -125,7 +125,7 @@ export default function OrderSummary() {
         courtName: bookingData.courtName,
         venueName: bookingData.venueName,
         selectedSlots: JSON.stringify(bookingData.selectedSlots),
-        timeSlotRanges: JSON.stringify(bookingData.timeSlotRanges), // Pass time slot ranges to checkout
+        timeSlotRanges: JSON.stringify(bookingData.timeSlotRanges), // Pass time slot ranges to payment
         selectedEquipment: JSON.stringify(bookingData.selectedEquipment),
         customerId: user.userId,
         specialRequests: specialRequests
@@ -335,14 +335,14 @@ export default function OrderSummary() {
         {/* Action Buttons */}
         <View className="p-4 space-y-3">
           <TouchableOpacity
-            onPress={handleProceedToCheckout}
+            onPress={handleProceedToPayment}
             disabled={loading}
             className={`p-4 rounded-lg ${
               loading ? 'bg-gray-300' : 'bg-orange-500'
             }`}
           >
             <Text className="text-center text-white font-semibold text-lg">
-              {loading ? 'Processing...' : 'Proceed to Checkout'}
+              {loading ? 'Processing...' : 'Proceed to Payment'}
             </Text>
           </TouchableOpacity>
 

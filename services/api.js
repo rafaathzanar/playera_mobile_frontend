@@ -219,6 +219,13 @@ class ApiService {
     });
   }
 
+  async createBookingWithPayment(bookingData) {
+    return await this.request("/bookings/with-payment", {
+      method: "POST",
+      body: JSON.stringify(bookingData),
+    });
+  }
+
   async getBookings(filters = {}) {
     const queryParams = new URLSearchParams(filters).toString();
     const endpoint = queryParams ? `/bookings?${queryParams}` : "/bookings";
@@ -384,6 +391,30 @@ class ApiService {
     return await this.request(`/payments/${paymentId}/refund`, {
       method: "POST",
       body: JSON.stringify(refundData),
+    });
+  }
+
+  // Stripe Payment APIs
+  async createPaymentIntent(paymentIntentData) {
+    return await this.request("/payments/create-intent", {
+      method: "POST",
+      body: JSON.stringify(paymentIntentData),
+    });
+  }
+
+  async confirmPaymentIntent(paymentIntentId) {
+    return await this.request(`/payments/confirm-intent/${paymentIntentId}`, {
+      method: "POST",
+    });
+  }
+
+  async getPaymentIntentStatus(paymentIntentId) {
+    return await this.request(`/payments/intent/${paymentIntentId}`);
+  }
+
+  async cancelPaymentIntent(paymentIntentId) {
+    return await this.request(`/payments/cancel-intent/${paymentIntentId}`, {
+      method: "POST",
     });
   }
 
