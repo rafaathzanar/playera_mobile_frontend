@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
+import { formatDateForDisplay } from "../../utils/dateUtils";
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
@@ -62,12 +63,7 @@ export default function BookingHistoryScreen() {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      return formatDateForDisplay(dateString);
     } catch (error) {
       return "Invalid Date";
     }

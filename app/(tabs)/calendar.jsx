@@ -3,6 +3,7 @@ import { SafeAreaView, View, Text, FlatList, StyleSheet, RefreshControl, Touchab
 import { Calendar } from "react-native-calendars";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
+import { getCurrentDateUTC, formatDateForDisplay } from "../../utils/dateUtils";
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState("");

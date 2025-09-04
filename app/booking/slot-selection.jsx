@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
+import { getCurrentDateUTC, formatDateUTC, debugDate } from "../../utils/dateUtils";
 
 export default function SlotSelection() {
   const { venueId, courtId } = useLocalSearchParams();
@@ -22,7 +23,7 @@ export default function SlotSelection() {
   const { user } = useAuth();
 
   // State
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getCurrentDateUTC());
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [court, setCourt] = useState(null);
@@ -147,15 +148,18 @@ export default function SlotSelection() {
     
     if (!dateString && date.timestamp) {
       const dateObj = new Date(date.timestamp);
-      dateString = dateObj.toISOString().split('T')[0];
+      dateString = formatDateUTC(dateObj);
     }
     
     if (!dateString) {
-      dateString = new Date().toISOString().split('T')[0];
+      dateString = getCurrentDateUTC();
       console.log('Using fallback date:', dateString);
     }
     
-    console.log('Final date string to use:', dateString);
+    // Ensure the date is in UTC format
+    dateString = formatDateUTC(dateString);
+    
+    debugDate('Date Selection', dateString);
     
     setSelectedDate(dateString);
     setSelectedSlots([]); // Reset selected slots when date changes
@@ -371,7 +375,7 @@ export default function SlotSelection() {
             markedDates={{
               [selectedDate]: { selected: true, selectedColor: '#FF4B00' }
             }}
-            minDate={new Date().toISOString().split('T')[0]}
+            minDate={getCurrentDateUTC()}
             theme={{
               selectedDayBackgroundColor: '#FF4B00',
               selectedDayTextColor: '#ffffff',

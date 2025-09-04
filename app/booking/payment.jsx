@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import { formatDateForDisplay } from '../../utils/dateUtils';
 
 const PaymentScreen = () => {
   const { user } = useAuth();
@@ -247,13 +248,7 @@ const PaymentScreen = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return formatDateForDisplay(dateString);
   };
 
   const formatTime = (timeString) => {

@@ -15,6 +15,7 @@ import { ArrowLeftIcon, CheckCircleIcon } from "react-native-heroicons/solid";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
+import { formatDateForDisplay } from "../../utils/dateUtils";
 
 export default function Checkout() {
   const params = useLocalSearchParams();
@@ -238,13 +239,7 @@ export default function Checkout() {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return formatDateForDisplay(dateString);
   };
 
   const formatTime = (timeString) => {

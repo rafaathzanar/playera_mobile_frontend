@@ -178,7 +178,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 
 // Importing local image as fallback
-const defaultProfilePic = require("../../assets/dp.jpeg");
+const defaultProfilePic = require("../../assets/dps.jpg");
 
 const ProfileScreen = () => {
   const router = useRouter();
