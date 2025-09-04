@@ -39,6 +39,9 @@ const SignInScreen = () => {
         placeholderTextColor={"gray"}
         value={email}
         onChangeText={setEmail}
+        keyboardType="email-address"
+        returnKeyType="next"
+        style={{ color: 'white' }}
       />
       <TextInput
         className="w-full p-4 border border-secondary  text-white rounded-lg mb-4"
@@ -47,6 +50,9 @@ const SignInScreen = () => {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        returnKeyType="done"
+        blurOnSubmit={true}
+        style={{ color: 'white' }}
       />
 
       <TouchableOpacity

@@ -74,6 +74,8 @@ const SignUpScreen = () => {
           placeholderTextColor="#A9A9A9"
           value={user.name}
           onChangeText={(text) => setUser({ ...user, name: text })}
+          returnKeyType="next"
+          style={{ color: 'white' }}
         />
         {errors.name ? <Text className="text-red-500">{errors.name}</Text> : null}
 
@@ -85,6 +87,8 @@ const SignUpScreen = () => {
           value={user.email}
           onChangeText={(text) => setUser({ ...user, email: text })}
           keyboardType="email-address"
+          returnKeyType="next"
+          style={{ color: 'white' }}
         />
         {errors.email ? <Text className="text-red-500">{errors.email}</Text> : null}
 
@@ -96,6 +100,8 @@ const SignUpScreen = () => {
           value={user.password}
           onChangeText={(text) => setUser({ ...user, password: text })}
           secureTextEntry
+          returnKeyType="next"
+          style={{ color: 'white' }}
         />
         {errors.password ? <Text className="text-red-500">{errors.password}</Text> : null}
 
@@ -107,6 +113,8 @@ const SignUpScreen = () => {
           value={user.confirmPassword}
           onChangeText={(text) => setUser({ ...user, confirmPassword: text })}
           secureTextEntry
+          returnKeyType="next"
+          style={{ color: 'white' }}
         />
         {errors.confirmPassword ? (
           <Text className="text-red-500">{errors.confirmPassword}</Text>
@@ -120,6 +128,9 @@ const SignUpScreen = () => {
           value={user.phone}
           onChangeText={(text) => setUser({ ...user, phone: text })}
           keyboardType="phone-pad"
+          returnKeyType="done"
+          blurOnSubmit={true}
+          style={{ color: 'white' }}
         />
         {errors.phone ? <Text className="text-red-500">{errors.phone}</Text> : null}
 

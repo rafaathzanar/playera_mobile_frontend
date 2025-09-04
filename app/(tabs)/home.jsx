@@ -45,12 +45,12 @@ export default function HomeScreen() {
     } else if (description.includes('cricket')) {
       return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=400&h=300&fit=crop';
     } else if (venueType.includes('indoor')) {
-      return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop';
+      return 'https://images.unsplash.com/photo-1587384474964-3a06ce1ce699?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8ZnV0c2FsfGVufDB8fDB8fHww';
     } else if (venueType.includes('outdoor')) {
       return 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=300&fit=crop';
     } else {
       // Default sports facility image
-      return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop';
+      return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=400&h=300&fit=crop';
     }
   };
 
