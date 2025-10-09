@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from 'react-native-heroicons/solid';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
+import { ImageGallery } from '../../components';
 
 export default function VenueDetail() {
   const { id } = useLocalSearchParams();
@@ -116,17 +117,6 @@ export default function VenueDetail() {
   };
 
 
-  // Get venue image
-  const getVenueImage = (venue) => {
-    if (venue.imageUrl) {
-      return venue.imageUrl;
-    }
-    if (venue.images && venue.images.length > 0) {
-      return venue.images[0];
-    }
-    return null;
-  };
-
   // Get equipment for a specific court
   const getEquipmentForCourt = (courtId) => {
     return equipment.filter(eq => eq.courtId === courtId);
@@ -147,19 +137,18 @@ export default function VenueDetail() {
           <TouchableOpacity 
               onPress={() => navigation.goBack()} 
               style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 }}
-            ></TouchableOpacity>
-          {getVenueImage(venue) ? (
-            <Image 
-              source={{ uri: getVenueImage(venue) }} 
-              className="w-full h-64" 
-              resizeMode="cover" 
-            />
-          ) : (
-            <View className="w-full h-64 bg-gray-200 flex items-center justify-center">
-              <Ionicons name="image-outline" size={48} color="#9CA3AF" />
-              <Text className="text-gray-500 mt-2">No image available</Text>
-            </View>
-          )}
+              className="absolute top-12 left-4 z-10"
+            >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          
+          {/* Image Gallery */}
+          <ImageGallery 
+            images={venue.images || []} 
+            height={256} 
+            showDots={true}
+          />
+          
           <View className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-20" />
           <View className="absolute bottom-4 left-4 right-4">
             <Text className="text-white text-3xl font-bold mb-1">{venue.name}</Text>

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeftIcon } from 'react-native-heroicons/solid';
 import { useNavigation } from '@react-navigation/native';
 import api from '../../../services/api';
+import { ImageGallery } from '../../../components';
 
 export default function CourtDetail() {
   const { courtId, venueId } = useLocalSearchParams();
@@ -70,17 +71,6 @@ export default function CourtDetail() {
     });
   };
 
-  // Get court image
-  const getCourtImage = (court) => {
-    if (court.imageUrl) {
-      return court.imageUrl;
-    }
-    if (court.images && court.images.length > 0) {
-      return court.images[0];
-    }
-    return null;
-  };
-
   // Format price for display
   const formatPrice = (pricePerHour) => {
     if (!pricePerHour) return 'Price not available';
@@ -103,19 +93,12 @@ export default function CourtDetail() {
           </View>
         </View>
 
-        {/* Court Image */}
-        {getCourtImage(court) ? (
-          <Image 
-            source={{ uri: getCourtImage(court) }} 
-            className="w-full h-48" 
-            resizeMode="cover" 
-          />
-        ) : (
-          <View className="w-full h-48 bg-gray-200 flex items-center justify-center">
-            <Ionicons name="image-outline" size={48} color="#9CA3AF" />
-            <Text className="text-gray-500 mt-2">No image available</Text>
-          </View>
-        )}
+        {/* Court Image Gallery */}
+        <ImageGallery 
+          images={court.images || []} 
+          height={192} 
+          showDots={true}
+        />
 
         {/* Court Information */}
         <View className="p-4">
