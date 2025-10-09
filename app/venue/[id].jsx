@@ -84,7 +84,12 @@ export default function VenueDetail() {
   };
 
   const handleCourtView = (courtId) => {
-    router.push(`/venue/court/${courtId}`);
+    router.push({
+      pathname: `/venue/court/${courtId}`,
+      params: {
+        venueId: id
+      }
+    });
   };
 
   const handleCourtBook = (courtId) => {

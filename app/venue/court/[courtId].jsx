@@ -11,6 +11,12 @@ export default function CourtDetail() {
   const router = useRouter();
   const navigation = useNavigation();
   
+  // Debug logging for parameters
+  console.log("=== DEBUG: Court Detail Parameters ===");
+  console.log("courtId:", courtId);
+  console.log("venueId:", venueId);
+  console.log("=====================================");
+  
   // State
   const [court, setCourt] = useState(null);
   const [venue, setVenue] = useState(null);
@@ -62,6 +68,16 @@ export default function CourtDetail() {
   }
 
   const handleBookNow = () => {
+    console.log("=== DEBUG: Court Booking ===");
+    console.log("venueId:", venueId);
+    console.log("courtId:", courtId);
+    console.log("========================");
+    
+    if (!venueId) {
+      Alert.alert('Error', 'Venue ID is missing. Please go back and try again.');
+      return;
+    }
+    
     router.push({
       pathname: '/booking/slot-selection',
       params: {
