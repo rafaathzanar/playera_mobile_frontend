@@ -118,9 +118,13 @@ export default function VenueDetail() {
 
   // Get venue image
   const getVenueImage = (venue) => {
-    if (venue.imageUrl) return venue.imageUrl;
-    if (venue.images && venue.images.length > 0) return venue.images[0];
-    return "https://t4.ftcdn.net/jpg/09/09/73/81/360_F_909738157_hkL2e79FofzkMcEy9DUiIHe3HrHX4jJP.jpg";
+    if (venue.imageUrl) {
+      return venue.imageUrl;
+    }
+    if (venue.images && venue.images.length > 0) {
+      return venue.images[0];
+    }
+    return null;
   };
 
   // Get equipment for a specific court
@@ -144,11 +148,18 @@ export default function VenueDetail() {
               onPress={() => navigation.goBack()} 
               style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 }}
             ></TouchableOpacity>
-          <Image 
-            source={{ uri: getVenueImage(venue) }} 
-            className="w-full h-64" 
-            resizeMode="cover" 
-          />
+          {getVenueImage(venue) ? (
+            <Image 
+              source={{ uri: getVenueImage(venue) }} 
+              className="w-full h-64" 
+              resizeMode="cover" 
+            />
+          ) : (
+            <View className="w-full h-64 bg-gray-200 flex items-center justify-center">
+              <Ionicons name="image-outline" size={48} color="#9CA3AF" />
+              <Text className="text-gray-500 mt-2">No image available</Text>
+            </View>
+          )}
           <View className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-20" />
           <View className="absolute bottom-4 left-4 right-4">
             <Text className="text-white text-3xl font-bold mb-1">{venue.name}</Text>

@@ -25,57 +25,44 @@ export default function HomeScreen() {
 
   // Function to get appropriate image for venue type
   const getVenueImage = (venue) => {
+    console.log("=== DEBUG: getVenueImage ===");
+    console.log("Venue:", venue.name);
+    console.log("Venue images:", venue.images);
+    console.log("Images length:", venue.images?.length);
+    console.log("Images type:", typeof venue.images);
+    console.log("Images is array:", Array.isArray(venue.images));
+    
     // If venue has images, use the first one
     if (venue.images && venue.images.length > 0) {
+      console.log("Using uploaded image:", venue.images[0]);
       return venue.images[0];
     }
     
-    // Otherwise, use dummy images based on venue type or description
-    const description = venue.description?.toLowerCase() || '';
-    const venueType = venue.venueType?.toLowerCase() || '';
-    
-    if (description.includes('basketball') || description.includes('indoor sports')) {
-      return 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop';
-    } else if (description.includes('tennis')) {
-      return 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=300&fit=crop';
-    } else if (description.includes('badminton') || description.includes('shuttle')) {
-      return 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=400&h=300&fit=crop';
-    } else if (description.includes('football') || description.includes('futsal')) {
-      return 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop';
-    } else if (description.includes('cricket')) {
-      return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=400&h=300&fit=crop';
-    } else if (venueType.includes('indoor')) {
-      return 'https://images.unsplash.com/photo-1587384474964-3a06ce1ce699?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8ZnV0c2FsfGVufDB8fDB8fHww';
-    } else if (venueType.includes('outdoor')) {
-      return 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=300&fit=crop';
-    } else {
-      // Default sports facility image
-      return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=400&h=300&fit=crop';
-    }
+    // No images available - return null to show placeholder
+    console.log("No images available for venue");
+    return null;
   };
 
   const loadVenues = async () => {
     try {
       setLoading(true);
       const response = await api.getVenues();
+      console.log("=== DEBUG: API Response ===");
       console.log("Fetched venues:", response);
       
       // Handle paginated response structure
       const venuesData = response.content || response;
       console.log("Extracted venues data:", venuesData);
       
+      // Debug first venue
+      if (venuesData && venuesData.length > 0) {
+        console.log("First venue:", venuesData[0]);
+        console.log("First venue images:", venuesData[0].images);
+        console.log("First venue keys:", Object.keys(venuesData[0]));
+      }
+      
       if (Array.isArray(venuesData)) {
         setVenues(venuesData);
-        // Debug: Log the first venue to see available fields
-        if (venuesData.length > 0) {
-          console.log("First venue object:", venuesData[0]);
-          console.log("Available fields:", Object.keys(venuesData[0]));
-          console.log("Courts data:", venuesData[0].courts);
-          if (venuesData[0].courts && Array.isArray(venuesData[0].courts)) {
-            console.log("First court object:", venuesData[0].courts[0]);
-            console.log("Court fields:", venuesData[0].courts[0] ? Object.keys(venuesData[0].courts[0]) : 'No courts');
-          }
-        }
       } else {
         console.error("Venues data is not an array:", venuesData);
       }

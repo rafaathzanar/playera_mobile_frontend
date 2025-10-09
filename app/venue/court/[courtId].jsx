@@ -72,9 +72,13 @@ export default function CourtDetail() {
 
   // Get court image
   const getCourtImage = (court) => {
-    if (court.imageUrl) return court.imageUrl;
-    if (court.images && court.images.length > 0) return court.images[0];
-    return "https://t4.ftcdn.net/jpg/09/09/73/81/360_F_909738157_hkL2e79FofzkMcEy9DUiIHe3HrHX4jJP.jpg";
+    if (court.imageUrl) {
+      return court.imageUrl;
+    }
+    if (court.images && court.images.length > 0) {
+      return court.images[0];
+    }
+    return null;
   };
 
   // Format price for display
@@ -100,11 +104,18 @@ export default function CourtDetail() {
         </View>
 
         {/* Court Image */}
-        <Image 
-          source={{ uri: getCourtImage(court) }} 
-          className="w-full h-48" 
-          resizeMode="cover" 
-        />
+        {getCourtImage(court) ? (
+          <Image 
+            source={{ uri: getCourtImage(court) }} 
+            className="w-full h-48" 
+            resizeMode="cover" 
+          />
+        ) : (
+          <View className="w-full h-48 bg-gray-200 flex items-center justify-center">
+            <Ionicons name="image-outline" size={48} color="#9CA3AF" />
+            <Text className="text-gray-500 mt-2">No image available</Text>
+          </View>
+        )}
 
         {/* Court Information */}
         <View className="p-4">

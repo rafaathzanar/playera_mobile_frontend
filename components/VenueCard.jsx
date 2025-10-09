@@ -67,11 +67,39 @@ export default function VenueCard({
     >
       {/* Image with gradient overlay */}
       <View className="relative">
-        <Image
-          source={{ uri: image }}
-          className="w-full h-28 rounded-t-2xl"
-          resizeMode="cover"
-        />
+        {image ? (
+          <Image
+            source={{ uri: image }}
+            className="w-full h-28 rounded-t-2xl"
+            resizeMode="cover"
+            onError={(error) => {
+              console.log("=== IMAGE LOADING ERROR ===");
+              console.log("Error:", error);
+              console.log("Failed to load image:", image);
+              console.log("Error details:", error.nativeEvent);
+              console.log("==========================");
+            }}
+            onLoad={() => {
+              console.log("=== IMAGE LOADED SUCCESSFULLY ===");
+              console.log("Image URL:", image);
+              console.log("=================================");
+            }}
+            onLoadStart={() => {
+              console.log("=== IMAGE LOADING STARTED ===");
+              console.log("Image URL:", image);
+              console.log("=============================");
+            }}
+            onLoadEnd={() => {
+              console.log("=== IMAGE LOADING ENDED ===");
+              console.log("Image URL:", image);
+              console.log("==========================");
+            }}
+          />
+        ) : (
+          <View className="w-full h-28 rounded-t-2xl bg-gray-200 flex items-center justify-center">
+            <Ionicons name="image-outline" size={32} color="#9CA3AF" />
+          </View>
+        )}
         <View className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-transparent to-black/20 rounded-t-2xl" />
         
         {/* Favorite button */}
