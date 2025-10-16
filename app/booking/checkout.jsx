@@ -107,18 +107,20 @@ export default function Checkout() {
         // Court bookings
         courtBookings: [{
           courtId: parseInt(bookingData.courtId),
-          timeDuration: Math.round(bookingData.totalDuration) // Ensure integer for validation
+          timeDuration: bookingData.totalDuration // Use exact duration for accurate cost calculation
         }],
         // Equipment bookings
         equipmentBookings: bookingData.selectedEquipment && bookingData.selectedEquipment.length > 0 
           ? bookingData.selectedEquipment.map(equipment => ({
               equipmentId: parseInt(equipment.id),
               quantity: parseInt(equipment.quantity),
-              timeDuration: Math.round(bookingData.totalDuration)
+              timeDuration: bookingData.totalDuration // Use exact duration for accurate cost calculation
             }))
           : [],
         // NEW: Time slot ranges for discontinuous booking
-        timeSlotRanges: timeSlotRanges || []
+        timeSlotRanges: timeSlotRanges || [],
+        // Include total cost calculated by frontend (includes dynamic pricing)
+        totalCost: bookingData.totalCost
       };
 
       console.log('Creating booking with data:', bookingRequest);

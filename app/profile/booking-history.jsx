@@ -20,6 +20,7 @@ export default function BookingHistoryScreen() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
 
   useEffect(() => {
     loadBookingHistory();
@@ -37,6 +38,18 @@ export default function BookingHistoryScreen() {
 
       const bookingData = await api.getBookingsByCustomer(user.userId);
       console.log("Booking history data:", bookingData);
+      
+      // Debug date fields
+      if (Array.isArray(bookingData.content || bookingData)) {
+        const bookings = bookingData.content || bookingData;
+        if (bookings.length > 0) {
+          console.log("=== DATE DEBUG ===");
+          console.log("First booking bookingDate:", bookings[0].bookingDate);
+          console.log("First booking createdAt:", bookings[0].createdAt);
+          console.log("First booking date:", bookings[0].date);
+          console.log("=== END DATE DEBUG ===");
+        }
+      }
       
       // Handle paginated response structure
       const bookingsData = bookingData.content || bookingData;
@@ -63,8 +76,16 @@ export default function BookingHistoryScreen() {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
+      // Handle LocalDateTime format (YYYY-MM-DDTHH:MM:SS)
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        const datePart = dateString.split('T')[0]; // Extract just the date part
+        return formatDateForDisplay(datePart);
+      }
+      
+      // Handle LocalDate format (YYYY-MM-DD) or other date strings
       return formatDateForDisplay(dateString);
     } catch (error) {
+      console.error("Error formatting date:", error, "Input:", dateString);
       return "Invalid Date";
     }
   };
@@ -108,6 +129,99 @@ export default function BookingHistoryScreen() {
   const getStatusText = (status) => {
     if (!status) return "Unknown";
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  };
+
+  const canCancelBooking = (booking) => {
+    // Check if booking is not already cancelled or completed
+    const status = booking.bookingStatus || booking.status;
+    if (status?.toLowerCase() === 'cancelled' || status?.toLowerCase() === 'completed') {
+      return false;
+    }
+
+    // Check if booking is at least 6 hours in the future
+    const bookingDate = new Date(booking.bookingDate || booking.date);
+    const now = new Date();
+    const sixHoursFromNow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+    
+    return bookingDate > sixHoursFromNow;
+  };
+
+  const handleCancelBooking = async (booking) => {
+    const bookingId = booking.bookingId;
+    
+    // Calculate refund amount based on cancellation policy
+    const bookingDate = new Date(booking.bookingDate || booking.date);
+    const now = new Date();
+    const hoursUntilBooking = (bookingDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    let refundPercentage = 0;
+    let refundAmount = 0;
+    let policyText = "";
+    
+    if (hoursUntilBooking >= 24) {
+      refundPercentage = 100;
+      refundAmount = booking.totalCost || booking.totalAmount || 0;
+      policyText = "Full refund (100%) - Cancelled 24+ hours before booking";
+    } else if (hoursUntilBooking >= 6) {
+      refundPercentage = 50;
+      refundAmount = (booking.totalCost || booking.totalAmount || 0) * 0.5;
+      policyText = "Partial refund (50%) - Cancelled 6-24 hours before booking";
+    } else {
+      refundPercentage = 0;
+      refundAmount = 0;
+      policyText = "No refund - Cancelled less than 6 hours before booking";
+    }
+    
+    Alert.alert(
+      "Cancel Booking",
+      `Are you sure you want to cancel this booking?\n\n` +
+      `📋 Cancellation Policy:\n${policyText}\n\n` +
+      `💰 Refund Amount: LKR ${refundAmount.toFixed(2)}\n\n` +
+      `This action cannot be undone.`,
+      [
+        {
+          text: "No",
+          style: "cancel"
+        },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setCancellingBookingId(bookingId);
+              await api.cancelBooking(bookingId);
+              
+              Alert.alert(
+                "Booking Cancelled",
+                `Your booking has been cancelled successfully.\n\n` +
+                `💰 Refund Amount: LKR ${refundAmount.toFixed(2)}\n` +
+                `📋 Refund Policy: ${policyText}\n\n` +
+                `The refund will be processed according to our cancellation policy.`,
+                [{ text: "OK" }]
+              );
+              
+              // Refresh the booking history
+              await loadBookingHistory();
+            } catch (error) {
+              console.error("Error cancelling booking:", error);
+              Alert.alert(
+                "Cancellation Failed",
+                error.message || "Failed to cancel booking. Please try again.",
+                [{ text: "OK" }]
+              );
+            } finally {
+              setCancellingBookingId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const getCancellationDeadline = (booking) => {
+    const bookingDate = new Date(booking.bookingDate || booking.date);
+    const deadline = new Date(bookingDate.getTime() - 6 * 60 * 60 * 1000);
+    return deadline.toLocaleString();
   };
 
   if (loading) {
@@ -230,6 +344,28 @@ export default function BookingHistoryScreen() {
                   <Text style={styles.createdAt}>
                     Booked on: {formatDate(booking.createdAt || booking.bookingDate || booking.date)}
                   </Text>
+                  
+                  {canCancelBooking(booking) && (
+                    <View style={styles.cancellationInfo}>
+                      <Text style={styles.cancellationDeadline}>
+                        Cancellation deadline: {getCancellationDeadline(booking)}
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.cancelButton,
+                          cancellingBookingId === booking.bookingId && styles.cancelButtonDisabled
+                        ]}
+                        onPress={() => handleCancelBooking(booking)}
+                        disabled={cancellingBookingId === booking.bookingId}
+                      >
+                        {cancellingBookingId === booking.bookingId ? (
+                          <ActivityIndicator size="small" color="white" />
+                        ) : (
+                          <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             ))}
@@ -390,5 +526,32 @@ const styles = StyleSheet.create({
   createdAt: {
     fontSize: 12,
     color: "#666",
+  },
+  cancellationInfo: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  cancellationDeadline: {
+    fontSize: 12,
+    color: "#FF9800",
+    marginBottom: 8,
+    fontWeight: "500",
+  },
+  cancelButton: {
+    backgroundColor: "#F44336",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  cancelButtonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  cancelButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

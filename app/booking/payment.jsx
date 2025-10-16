@@ -188,17 +188,18 @@ const PaymentScreen = () => {
         specialRequests: bookingData.specialRequests || "",
         courtBookings: [{
           courtId: parseInt(bookingData.courtId),
-          timeDuration: Math.round(bookingData.totalDuration)
+          timeDuration: bookingData.totalDuration
         }],
         equipmentBookings: bookingData.selectedEquipment && bookingData.selectedEquipment.length > 0 
           ? bookingData.selectedEquipment.map(equipment => ({
               equipmentId: parseInt(equipment.id),
               quantity: parseInt(equipment.quantity),
-              timeDuration: Math.round(bookingData.totalDuration)
+              timeDuration: bookingData.totalDuration
             }))
           : [],
         timeSlotRanges: bookingData.timeSlotRanges || [],
-        paymentIntentId: paymentIntent?.paymentIntentId // Include payment intent for verification
+        paymentIntentId: paymentIntent?.paymentIntentId, // Include payment intent for verification
+        totalCost: bookingData.totalCost // Include total cost calculated by frontend (includes dynamic pricing)
       };
 
       console.log('Creating booking with payment verification:', bookingRequest);
@@ -236,9 +237,39 @@ const PaymentScreen = () => {
       console.error('Payment Intent ID:', paymentIntent?.paymentIntentId);
       console.error('Payment Status:', paymentIntent?.status);
       
+      // Extract error message from response
+      let errorMessage = 'Payment was successful but booking creation failed.';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Check for specific validation errors
+      if (errorMessage.includes('Booking duration must be at least')) {
+        errorMessage = 'Booking duration requirement not met. Please go back and select more time slots.';
+      } else if (errorMessage.includes('Court is not available')) {
+        errorMessage = 'The selected time slots are no longer available. Please go back and select different slots.';
+      } else if (errorMessage.includes('Customer not found')) {
+        errorMessage = 'User account issue. Please log out and log back in.';
+      }
+      
       Alert.alert(
         'Booking Failed', 
-        'Payment was successful but booking creation failed. Please contact support with your payment reference: ' + (paymentIntent?.paymentIntentId || 'Unknown')
+        `${errorMessage}\n\nPayment Reference: ${paymentIntent?.paymentIntentId || 'Unknown'}\n\nPlease contact support if this issue persists.`,
+        [
+          {
+            text: 'Go Back',
+            onPress: () => router.back()
+          },
+          {
+            text: 'Contact Support',
+            onPress: () => {
+              // You could add a contact support action here
+              console.log('Contact support pressed');
+            }
+          }
+        ]
       );
     }
   };

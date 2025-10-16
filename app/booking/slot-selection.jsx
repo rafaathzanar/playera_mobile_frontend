@@ -538,6 +538,30 @@ export default function SlotSelection() {
 
     const { totalDuration, totalCost } = calculateTotals();
     
+    // Check minimum booking duration requirement
+    if (court && court.minBookingDuration && totalDuration < court.minBookingDuration) {
+      const minHours = court.minBookingDuration;
+      const minSlots = Math.ceil(minHours * 2); // Assuming 30-minute slots
+      Alert.alert(
+        "Minimum Booking Duration Required",
+        `You need to book at least ${minHours} hour${minHours > 1 ? 's' : ''} (${minSlots} slot${minSlots > 1 ? 's' : ''}) for ${court.courtName}. Please select more time slots.`,
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
+    // Check maximum booking duration requirement
+    if (court && court.maxBookingDuration && totalDuration > court.maxBookingDuration) {
+      const maxHours = court.maxBookingDuration;
+      const maxSlots = Math.floor(maxHours * 2); // Assuming 30-minute slots
+      Alert.alert(
+        "Maximum Booking Duration Exceeded",
+        `You can book a maximum of ${maxHours} hour${maxHours > 1 ? 's' : ''} (${maxSlots} slot${maxSlots > 1 ? 's' : ''}) for ${court.courtName}. Please reduce your selection.`,
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
     // Prepare equipment data for next page
     const selectedEquipmentData = Object.entries(selectedEquipment).map(([equipmentId, quantity]) => {
       const equipmentItem = equipment.find(e => e.equipmentId == equipmentId);
@@ -632,6 +656,23 @@ export default function SlotSelection() {
           <Text className="text-2xl font-bold text-gray-800">{court?.courtName}</Text>
           <Text className="text-lg text-gray-600">{venue?.name}</Text>
           <Text className="text-gray-600">Price: LKR {court?.pricePerHour}/hour</Text>
+          
+          {/* Booking Requirements */}
+          {court && (court.minBookingDuration || court.maxBookingDuration) && (
+            <View className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <Text className="text-sm font-semibold text-blue-800 mb-1">Booking Requirements:</Text>
+              {court.minBookingDuration && (
+                <Text className="text-sm text-blue-700">
+                  • Minimum: {court.minBookingDuration} hour{court.minBookingDuration > 1 ? 's' : ''}
+                </Text>
+              )}
+              {court.maxBookingDuration && (
+                <Text className="text-sm text-blue-700">
+                  • Maximum: {court.maxBookingDuration} hour{court.maxBookingDuration > 1 ? 's' : ''}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Calendar */}
@@ -866,21 +907,74 @@ export default function SlotSelection() {
           </View>
         </View>
 
+        {/* Selection Status */}
+        {court && (court.minBookingDuration || court.maxBookingDuration) && (
+          <View className="px-4 pb-2">
+            {(() => {
+              const { totalDuration } = calculateTotals();
+              const meetsMinimum = !court.minBookingDuration || totalDuration >= court.minBookingDuration;
+              const withinMaximum = !court.maxBookingDuration || totalDuration <= court.maxBookingDuration;
+              const isValidSelection = meetsMinimum && withinMaximum;
+              
+              return (
+                <View className={`p-3 rounded-lg border ${
+                  isValidSelection 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <Text className={`text-sm font-medium ${
+                    isValidSelection ? 'text-green-800' : 'text-yellow-800'
+                  }`}>
+                    {isValidSelection ? '✓ Selection Valid' : '⚠ Selection Requirements'}
+                  </Text>
+                  {!meetsMinimum && (
+                    <Text className="text-xs text-yellow-700 mt-1">
+                      Need at least {court.minBookingDuration} hour{court.minBookingDuration > 1 ? 's' : ''} (currently {totalDuration.toFixed(1)} hours)
+                    </Text>
+                  )}
+                  {!withinMaximum && (
+                    <Text className="text-xs text-yellow-700 mt-1">
+                      Maximum {court.maxBookingDuration} hour{court.maxBookingDuration > 1 ? 's' : ''} allowed (currently {totalDuration.toFixed(1)} hours)
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+          </View>
+        )}
+
         {/* Proceed Button */}
         <View className="p-4">
-          <TouchableOpacity
-            onPress={handleProceed}
-            disabled={selectedSlots.length === 0}
-            className={`p-4 rounded-lg ${
-              selectedSlots.length === 0
-                ? 'bg-gray-300'
-                : 'bg-orange-500'
-            }`}
-          >
-            <Text className="text-center text-white font-semibold text-lg">
-              Proceed to Order Summary
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const { totalDuration } = calculateTotals();
+            const meetsMinimum = !court?.minBookingDuration || totalDuration >= court.minBookingDuration;
+            const withinMaximum = !court?.maxBookingDuration || totalDuration <= court.maxBookingDuration;
+            const isValidSelection = meetsMinimum && withinMaximum;
+            const isDisabled = selectedSlots.length === 0 || !isValidSelection;
+            
+            return (
+              <TouchableOpacity
+                onPress={handleProceed}
+                disabled={isDisabled}
+                className={`p-4 rounded-lg ${
+                  isDisabled
+                    ? 'bg-gray-300'
+                    : 'bg-orange-500'
+                }`}
+              >
+                <Text className={`text-center font-semibold text-lg ${
+                  isDisabled ? 'text-gray-500' : 'text-white'
+                }`}>
+                  {selectedSlots.length === 0 
+                    ? 'Select Time Slots' 
+                    : !isValidSelection 
+                      ? 'Complete Selection Requirements'
+                      : 'Proceed to Order Summary'
+                  }
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
         </View>
       </ScrollView>
     </SafeAreaView>
