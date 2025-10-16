@@ -131,12 +131,14 @@ export default function SlotSelection() {
       console.log('=== BACKEND SLOTS DEBUG ===');
       console.log('Available slots from API:', availableSlots);
       if (availableSlots && availableSlots.length > 0) {
-        console.log('First few slots:');
+        console.log('First few slots with pricing:');
         availableSlots.slice(0, 3).forEach((slot, index) => {
           console.log(`Slot ${index + 1}:`, {
             startTime: slot.startTime,
             endTime: slot.endTime,
-            time: `${slot.startTime} - ${slot.endTime}`
+            time: `${slot.startTime} - ${slot.endTime}`,
+            pricePerHour: slot.pricePerHour,
+            status: slot.status
           });
         });
       }
@@ -152,6 +154,7 @@ export default function SlotSelection() {
           available: slot.status === 'AVAILABLE', // Mark availability based on status
           status: slot.status,
           slotId: slot.slotId,
+          pricePerHour: slot.pricePerHour, // IMPORTANT: Preserve dynamic pricing from API
           originalSlot: slot
         }));
         
@@ -486,7 +489,32 @@ export default function SlotSelection() {
   // Calculate total duration and cost
   const calculateTotals = () => {
     const totalDuration = selectedSlots.length * 0.5; // 30 minutes per slot
-    const courtCost = court ? court.pricePerHour * totalDuration : 0;
+    
+    // Calculate court cost using dynamic pricing from individual slots
+    let courtCost = 0;
+    if (selectedSlots.length > 0) {
+      console.log('=== DYNAMIC PRICING CALCULATION DEBUG ===');
+      console.log('Selected slots:', selectedSlots.length);
+      console.log('Court base price:', court?.pricePerHour);
+      
+      // Each slot has its own dynamic price from the API
+      courtCost = selectedSlots.reduce((total, slot) => {
+        // Use the dynamic price from the slot if available, otherwise fallback to court base price
+        const slotPrice = slot.pricePerHour || court?.pricePerHour || 0;
+        const slotCost = slotPrice * 0.5; // 0.5 hours per slot
+        
+        console.log(`Slot ${slot.time}:`, {
+          slotPrice: slotPrice,
+          slotCost: slotCost,
+          hasDynamicPrice: !!slot.pricePerHour
+        });
+        
+        return total + slotCost;
+      }, 0);
+      
+      console.log('Total court cost:', courtCost);
+      console.log('=== END DYNAMIC PRICING DEBUG ===');
+    }
     
     let equipmentCost = 0;
     Object.entries(selectedEquipment).forEach(([equipmentId, quantity]) => {
