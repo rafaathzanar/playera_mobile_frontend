@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeftIcon } from "react-native-heroicons/solid";
@@ -15,6 +16,7 @@ import { Calendar } from "react-native-calendars";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 import { getCurrentDateUTC, formatDateUTC, debugDate } from "../../utils/dateUtils";
+import { AvailabilityService } from "../../services/availabilityService";
 
 export default function SlotSelection() {
   const { venueId, courtId } = useLocalSearchParams();
@@ -33,6 +35,12 @@ export default function SlotSelection() {
   const [selectedEquipment, setSelectedEquipment] = useState({});
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  
+  // Enhanced state for availability checking and reservations
+  const [availabilityService] = useState(() => new AvailabilityService());
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [slotReservations, setSlotReservations] = useState(new Map());
+  const [reservationTimers, setReservationTimers] = useState(new Map());
 
   // Fetch court, venue, and equipment data
   useEffect(() => {
@@ -70,6 +78,26 @@ export default function SlotSelection() {
       fetchAvailableSlots(selectedDate);
     }
   }, [court, selectedDate]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Cancel all active reservations
+      slotReservations.forEach(async (reservation, key) => {
+        try {
+          await availabilityService.cancelReservation(reservation.reservationId);
+        } catch (error) {
+          console.error("Error cancelling reservation on unmount:", error);
+        }
+      });
+      
+      // Clear all timers
+      reservationTimers.forEach(timer => clearInterval(timer));
+      
+      // Cleanup availability service
+      availabilityService.cleanup();
+    };
+  }, []);
 
   // Fetch available equipment
   const fetchEquipment = async () => {
@@ -115,17 +143,19 @@ export default function SlotSelection() {
       console.log('=== END BACKEND SLOTS DEBUG ===');
       
       if (availableSlots && Array.isArray(availableSlots)) {
-        // Transform the API response to match our format
+        // Show all slots (both available and booked) but mark availability
         const formattedSlots = availableSlots.map(slot => ({
           id: `${slot.courtId}-${slot.date}-${slot.startTime}`,
           time: `${slot.startTime} - ${slot.endTime}`,
           startTime: slot.startTime,
           endTime: slot.endTime,
-          available: slot.status === 'AVAILABLE',
+          available: slot.status === 'AVAILABLE', // Mark availability based on status
           status: slot.status,
           slotId: slot.slotId,
           originalSlot: slot
         }));
+        
+        console.log(`Showing ${formattedSlots.length} total slots (${formattedSlots.filter(s => s.available).length} available, ${formattedSlots.filter(s => !s.available).length} booked)`);
         setAvailableSlots(formattedSlots);
       } else {
         setAvailableSlots([]);
@@ -209,10 +239,111 @@ export default function SlotSelection() {
     return ranges;
   };
 
-  // Toggle slot selection
-  const toggleSlot = (slot) => {
-    if (!slot.available) return;
+  // Enhanced slot selection with real-time availability checking
+  const toggleSlot = async (slot) => {
+    // Don't allow interaction with booked slots
+    if (!slot.available) {
+      Alert.alert(
+        "Slot Not Available",
+        "This time slot has already been booked by another user.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     
+    // Check if slot is already reserved by this user
+    const reservationKey = `${courtId}-${selectedDate}-${slot.startTime}-${slot.endTime}`;
+    const existingReservation = slotReservations.get(reservationKey);
+    
+    if (existingReservation) {
+      // Cancel existing reservation
+      await cancelSlotReservation(slot);
+      return;
+    }
+    
+    // Try enhanced availability checking first, fallback to original behavior
+    setCheckingAvailability(true);
+    try {
+      const availability = await availabilityService.checkAvailability(
+        courtId,
+        selectedDate,
+        slot.startTime,
+        slot.endTime,
+        user?.userId
+      );
+      
+      // If availability service is working and slot is not available
+      if (availability && !availability.available && !availability.fallback) {
+        Alert.alert(
+          "Slot No Longer Available",
+          "This time slot has been booked by another user. Please select a different slot.",
+          [{ text: "OK" }]
+        );
+        
+        // Refresh available slots
+        await fetchAvailableSlots(selectedDate);
+        return;
+      }
+      
+      // If availability service returned fallback, skip reservation attempt
+      if (availability && availability.fallback) {
+        console.log("Availability service returned fallback, skipping reservation attempt");
+        // Fall through to original behavior
+      } else {
+      
+      // Try to reserve the slot temporarily
+      const reservation = await availabilityService.reserveTimeSlot(
+        courtId,
+        selectedDate,
+        slot.startTime,
+        slot.endTime,
+        user?.userId
+      );
+      
+      if (reservation && reservation.success) {
+        // Add to selected slots
+        setSelectedSlots(prev => [...prev, slot]);
+        
+        // Store reservation info
+        setSlotReservations(prev => {
+          const newMap = new Map(prev);
+          newMap.set(reservationKey, {
+            reservationId: reservation.reservationId,
+            expiresAt: new Date(reservation.expiresAt),
+            slot: slot
+          });
+          return newMap;
+        });
+        
+        // Start countdown timer
+        startReservationTimer(reservationKey, reservation.expiresAt);
+        
+        Alert.alert(
+          "Slot Reserved",
+          `Time slot ${slot.time} has been reserved for 5 minutes. Complete your booking before it expires.`,
+          [{ text: "OK" }]
+        );
+        return;
+      }
+      
+      // If reservation failed or returned fallback, fall through to original behavior
+      if (reservation && reservation.fallback) {
+        console.log("Reservation service returned fallback, using original slot selection");
+      } else {
+        console.log("Reservation service not available, using original slot selection");
+      }
+      
+      } // Close the else block for availability.fallback check
+      
+    } catch (error) {
+      console.error("Error with availability service:", error);
+      console.log("Falling back to original slot selection behavior");
+    } finally {
+      setCheckingAvailability(false);
+    }
+    
+    // Fallback to original slot selection behavior
+    const wasSelected = selectedSlots.find(s => s.id === slot.id);
     setSelectedSlots(prev => {
       const isSelected = prev.find(s => s.id === slot.id);
       if (isSelected) {
@@ -221,6 +352,114 @@ export default function SlotSelection() {
         return [...prev, slot];
       }
     });
+    
+    // Show appropriate message based on action
+    if (wasSelected) {
+      Alert.alert(
+        "Slot Unselected",
+        `Time slot ${slot.time} has been unselected.`,
+        [{ text: "OK" }]
+      );
+    } else {
+      Alert.alert(
+        "Slot Selected",
+        `Time slot ${slot.time} has been selected.`,
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  // Cancel slot reservation
+  const cancelSlotReservation = async (slot) => {
+    const reservationKey = `${courtId}-${selectedDate}-${slot.startTime}-${slot.endTime}`;
+    const reservation = slotReservations.get(reservationKey);
+    
+    if (reservation) {
+      try {
+        await availabilityService.cancelReservation(reservation.reservationId);
+        
+        // Remove from selected slots
+        setSelectedSlots(prev => prev.filter(s => s.id !== slot.id));
+        
+        // Remove reservation
+        setSlotReservations(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(reservationKey);
+          return newMap;
+        });
+        
+        // Clear timer
+        clearReservationTimer(reservationKey);
+        
+        Alert.alert(
+          "Reservation Cancelled",
+          `Time slot ${slot.time} reservation has been cancelled.`,
+          [{ text: "OK" }]
+        );
+        
+      } catch (error) {
+        console.error("Error cancelling reservation:", error);
+      }
+    }
+  };
+
+  // Start reservation countdown timer
+  const startReservationTimer = (reservationKey, expiresAt) => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const expirationTime = new Date(expiresAt);
+      
+      if (now >= expirationTime) {
+        // Reservation expired
+        clearInterval(timer);
+        handleReservationExpired(reservationKey);
+      }
+    }, 1000); // Check every second
+    
+    setReservationTimers(prev => {
+      const newMap = new Map(prev);
+      newMap.set(reservationKey, timer);
+      return newMap;
+    });
+  };
+
+  // Clear reservation timer
+  const clearReservationTimer = (reservationKey) => {
+    const timer = reservationTimers.get(reservationKey);
+    if (timer) {
+      clearInterval(timer);
+      setReservationTimers(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(reservationKey);
+        return newMap;
+      });
+    }
+  };
+
+  // Handle reservation expiration
+  const handleReservationExpired = (reservationKey) => {
+    const reservation = slotReservations.get(reservationKey);
+    if (reservation) {
+      // Remove from selected slots
+      setSelectedSlots(prev => prev.filter(s => s.id !== reservation.slot.id));
+      
+      // Remove reservation
+      setSlotReservations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(reservationKey);
+        return newMap;
+      });
+      
+      // Show expiration alert
+      Alert.alert(
+        "Reservation Expired",
+        "Your time slot reservation has expired. Please select a new slot.",
+        [{ text: "OK" }]
+      );
+      
+      // Refresh available slots
+      fetchAvailableSlots(selectedDate);
+    }
   };
 
   // Increase equipment quantity
@@ -390,50 +629,65 @@ export default function SlotSelection() {
         {/* Available Slots */}
         {selectedDate && (
           <View className="p-4">
-            <Text className="text-lg font-semibold mb-3">Available Time Slots</Text>
+            <Text className="text-lg font-semibold mb-3">Time Slots</Text>
             {slotsLoading ? (
               <View className="py-8">
                 <Text className="text-center text-gray-500">Loading slots...</Text>
               </View>
             ) : availableSlots.length > 0 ? (
               <View className="flex-row flex-wrap gap-2">
-                {availableSlots.map((slot) => (
-                  <TouchableOpacity
-                    key={slot.id}
-                    onPress={() => toggleSlot(slot)}
-                    className={`p-3 rounded-lg border-2 ${
-                      selectedSlots.find(s => s.id === slot.id)
-                        ? 'border-orange-500 bg-orange-100'
-                        : slot.available
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-300 bg-gray-100'
-                    }`}
-                    disabled={!slot.available}
-                  >
-                    <Text
-                      className={`text-sm font-medium ${
-                        selectedSlots.find(s => s.id === slot.id)
-                          ? 'text-orange-800'
-                          : slot.available
-                          ? 'text-green-800'
-                          : 'text-gray-500'
-                      }`}
+                {availableSlots.map((slot) => {
+                  const reservationKey = `${courtId}-${selectedDate}-${slot.startTime}-${slot.endTime}`;
+                  const reservation = slotReservations.get(reservationKey);
+                  const isSelected = selectedSlots.find(s => s.id === slot.id);
+                  const isReservedByUser = reservation && reservation.expiresAt > new Date();
+                  
+                  let slotStatus = "Available";
+                  let slotStyle = "border-green-300 bg-green-50";
+                  let textStyle = "text-green-800";
+                  
+                  if (!slot.available) {
+                    slotStatus = "Booked";
+                    slotStyle = "border-gray-300 bg-gray-100 opacity-50";
+                    textStyle = "text-gray-500";
+                  } else if (isReservedByUser) {
+                    slotStatus = "Reserved by you";
+                    slotStyle = "border-orange-500 bg-orange-100";
+                    textStyle = "text-orange-800";
+                  } else if (isSelected) {
+                    slotStatus = "Selected";
+                    slotStyle = "border-blue-500 bg-blue-100";
+                    textStyle = "text-blue-800";
+                  } else {
+                    slotStatus = "Available";
+                    slotStyle = "border-green-300 bg-green-50";
+                    textStyle = "text-green-800";
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={slot.id}
+                      onPress={() => toggleSlot(slot)}
+                      className={`p-3 rounded-lg border-2 ${slotStyle}`}
+                      disabled={!slot.available || checkingAvailability}
                     >
-                      {slot.time}
-                    </Text>
-                    <Text
-                      className={`text-xs ${
-                        selectedSlots.find(s => s.id === slot.id)
-                          ? 'text-orange-600'
-                          : slot.available
-                          ? 'text-green-600'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {slot.available ? 'Available' : slot.status}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text className={`text-sm font-medium ${textStyle}`}>
+                        {slot.time}
+                      </Text>
+                      <Text className={`text-xs ${textStyle}`}>
+                        {slotStatus}
+                      </Text>
+                      {isReservedByUser && (
+                        <Text className="text-xs text-orange-600 mt-1">
+                          Expires: {reservation.expiresAt.toLocaleTimeString()}
+                        </Text>
+                      )}
+                      {checkingAvailability && (
+                        <ActivityIndicator size="small" color="#f97316" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ) : (
               <View className="py-8">
@@ -473,6 +727,36 @@ export default function SlotSelection() {
                 </Text>
               </View>
             )}
+          </View>
+        )}
+
+        {/* Active Reservations Status */}
+        {slotReservations.size > 0 && (
+          <View className="p-4 bg-yellow-50 mx-4 rounded-lg mb-4">
+            <Text className="text-lg font-semibold text-yellow-800 mb-2">
+              Active Reservations
+            </Text>
+            {Array.from(slotReservations.entries()).map(([key, reservation]) => (
+              <View key={key} className="bg-white p-3 rounded-lg mb-2 border border-yellow-200">
+                <Text className="font-medium text-gray-800">
+                  {reservation.slot.time}
+                </Text>
+                <Text className="text-sm text-gray-600">
+                  Expires: {reservation.expiresAt.toLocaleTimeString()}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => cancelSlotReservation(reservation.slot)}
+                  className="mt-2 bg-red-500 px-3 py-1 rounded"
+                >
+                  <Text className="text-white text-sm">Cancel Reservation</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <View className="mt-2 p-2 bg-orange-100 rounded">
+              <Text className="text-sm text-orange-800 text-center">
+                ⏰ Complete your booking before reservations expire!
+              </Text>
+            </View>
           </View>
         )}
 

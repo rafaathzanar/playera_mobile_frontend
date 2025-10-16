@@ -45,7 +45,7 @@ const NotificationItem = ({ notification, onDelete, onMarkAsRead }) => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'BOOKING_CONFIRMED':
+      case 'BOOKING_BOOKED':
         return 'checkmark-circle';
       case 'BOOKING_REMINDER':
         return 'time';
@@ -62,7 +62,7 @@ const NotificationItem = ({ notification, onDelete, onMarkAsRead }) => {
 
   const getNotificationColor = (type) => {
     switch (type) {
-      case 'BOOKING_CONFIRMED':
+      case 'BOOKING_BOOKED':
         return '#10B981';
       case 'BOOKING_REMINDER':
         return '#F59E0B';

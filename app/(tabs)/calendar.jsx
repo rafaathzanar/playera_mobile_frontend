@@ -69,11 +69,8 @@ export default function CalendarScreen() {
     let color = "gray"; // Default color
     
     switch (booking.status?.toUpperCase()) {
-      case "CONFIRMED":
+      case "BOOKED":
         color = "green";
-        break;
-      case "PENDING":
-        color = "yellow";
         break;
       case "CANCELLED":
         color = "red";
@@ -217,10 +214,8 @@ export default function CalendarScreen() {
 
 const getStatusColor = (status) => {
   switch (status?.toUpperCase()) {
-    case "CONFIRMED":
+    case "BOOKED":
       return "#10B981";
-    case "PENDING":
-      return "#F59E0B";
     case "CANCELLED":
       return "#EF4444";
     case "COMPLETED":
