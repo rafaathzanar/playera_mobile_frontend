@@ -36,11 +36,33 @@ export default function SlotSelection() {
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   
+  // Loyalty system state
+  const [loyaltyInfo, setLoyaltyInfo] = useState(null);
+  const [goldCoinsToRedeem, setGoldCoinsToRedeem] = useState(0);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  
   // Enhanced state for availability checking and reservations
   const [availabilityService] = useState(() => new AvailabilityService());
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [slotReservations, setSlotReservations] = useState(new Map());
   const [reservationTimers, setReservationTimers] = useState(new Map());
+
+  // Load loyalty information
+  const loadLoyaltyInfo = async () => {
+    try {
+      if (user?.userId) {
+        const loyaltyData = await api.getLoyaltyProfile(user.userId);
+        setLoyaltyInfo(loyaltyData);
+        console.log("Loyalty data loaded:", loyaltyData);
+      } else {
+        console.log("No authenticated user, skipping loyalty data load");
+        setLoyaltyInfo(null);
+      }
+    } catch (error) {
+      console.error('Error loading loyalty info:', error);
+      setLoyaltyInfo(null);
+    }
+  };
 
   // Fetch court, venue, and equipment data
   useEffect(() => {
@@ -58,6 +80,9 @@ export default function SlotSelection() {
         
         // Fetch available equipment for this court
         await fetchEquipment();
+        
+        // Load loyalty information
+        await loadLoyaltyInfo();
         
       } catch (error) {
         console.error("Error fetching court and venue details:", error);
@@ -524,9 +549,33 @@ export default function SlotSelection() {
       }
     });
     
-    const totalCost = courtCost + equipmentCost;
+    const subtotal = courtCost + equipmentCost;
     
-    return { totalDuration, courtCost, equipmentCost, totalCost };
+    // Calculate loyalty discounts
+    let tierDiscount = 0;
+    let goldCoinDiscount = 0;
+    
+    if (loyaltyInfo && loyaltyInfo.goldCoins !== undefined) {
+      // Tier-based discount
+      tierDiscount = subtotal * (1 - loyaltyInfo.discountMultiplier);
+      
+      // Gold coin discount (1 coin = 1 LKR)
+      goldCoinDiscount = Math.min(goldCoinsToRedeem, loyaltyInfo.goldCoins, subtotal);
+    }
+    
+    const totalDiscount = tierDiscount + goldCoinDiscount;
+    const totalCost = subtotal - totalDiscount;
+    
+    return { 
+      totalDuration, 
+      courtCost, 
+      equipmentCost, 
+      subtotal,
+      tierDiscount,
+      goldCoinDiscount,
+      totalDiscount,
+      totalCost 
+    };
   };
 
   // Handle proceed to order summary
@@ -536,7 +585,7 @@ export default function SlotSelection() {
       return;
     }
 
-    const { totalDuration, totalCost } = calculateTotals();
+    const { totalDuration, totalCost, subtotal, tierDiscount, goldCoinDiscount } = calculateTotals();
     
     // Check minimum booking duration requirement
     if (court && court.minBookingDuration && totalDuration < court.minBookingDuration) {
@@ -625,7 +674,11 @@ export default function SlotSelection() {
         selectedSlots: JSON.stringify(slotData),
         timeSlotRanges: JSON.stringify(timeSlotRanges), // NEW: Pass time slot ranges
         selectedEquipment: JSON.stringify(selectedEquipmentData),
-        customerId: user?.userId
+        customerId: user?.userId,
+        goldCoinsToRedeem: goldCoinsToRedeem.toString(),
+        loyaltyTier: loyaltyInfo?.currentTier || 'BRONZE',
+        tierDiscount: tierDiscount.toFixed(2),
+        goldCoinDiscount: goldCoinDiscount.toFixed(2)
       }
     });
   };
@@ -638,17 +691,27 @@ export default function SlotSelection() {
     );
   }
 
-  const { totalDuration, courtCost, equipmentCost, totalCost } = calculateTotals();
+  const { totalDuration, courtCost, equipmentCost, subtotal, tierDiscount, goldCoinDiscount, totalCost } = calculateTotals();
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView>
         {/* Header */}
-        <View className="flex-row items-center p-4 bg-orange-500">
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <ArrowLeftIcon size={24} color="white" />
-          </TouchableOpacity>
-          <Text className="text-xl font-bold text-white ml-4">Select Slots & Equipment</Text>
+        <View className="flex-row items-center justify-between p-4 bg-orange-500">
+          <View className="flex-row items-center">
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <ArrowLeftIcon size={24} color="white" />
+            </TouchableOpacity>
+            <Text className="text-xl font-bold text-white ml-4">Select Slots & Equipment</Text>
+          </View>
+          
+          {/* Gold Coin Indicator */}
+          {loyaltyInfo && loyaltyInfo.goldCoins !== undefined && loyaltyInfo.goldCoins > 0 && (
+            <View className="flex-row items-center bg-yellow-400 px-3 py-1 rounded-full">
+              <Text className="text-yellow-800 font-bold mr-1">🪙</Text>
+              <Text className="text-yellow-800 font-bold">{loyaltyInfo.goldCoins}</Text>
+            </View>
+          )}
         </View>
 
         {/* Court and Venue Info */}
@@ -896,6 +959,29 @@ export default function SlotSelection() {
               <Text className="text-gray-600">Equipment Cost:</Text>
               <Text className="font-medium">LKR {equipmentCost.toFixed(2)}</Text>
             </View>
+            <View className="flex-row justify-between">
+              <Text className="text-gray-600">Subtotal:</Text>
+              <Text className="font-medium">LKR {subtotal.toFixed(2)}</Text>
+            </View>
+            
+            {/* Loyalty Discounts */}
+            {loyaltyInfo && loyaltyInfo.goldCoins !== undefined && (tierDiscount > 0 || goldCoinDiscount > 0) && (
+              <>
+                {tierDiscount > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-green-600">Tier Discount ({loyaltyInfo.currentTier}):</Text>
+                    <Text className="font-medium text-green-600">-LKR {tierDiscount.toFixed(2)}</Text>
+                  </View>
+                )}
+                {goldCoinDiscount > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-yellow-600">Gold Coins ({goldCoinsToRedeem} coins):</Text>
+                    <Text className="font-medium text-yellow-600">-LKR {goldCoinDiscount.toFixed(2)}</Text>
+                  </View>
+                )}
+              </>
+            )}
+            
             <View className="flex-row justify-between pt-2 border-t border-gray-200">
               <Text className="font-semibold">Total Cost:</Text>
               <Text className="font-bold text-lg text-orange-600">LKR {totalCost.toFixed(2)}</Text>
@@ -906,6 +992,86 @@ export default function SlotSelection() {
             </View>
           </View>
         </View>
+
+        {/* Gold Coin Redemption */}
+        {loyaltyInfo && loyaltyInfo.goldCoins !== undefined && loyaltyInfo.goldCoins > 0 && (
+          <View className="p-4 bg-yellow-50 border border-yellow-200">
+            <Text className="text-lg font-semibold mb-3 text-yellow-800">🪙 Gold Coin Redemption</Text>
+            <View className="space-y-3">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-gray-700">Available Gold Coins:</Text>
+                <Text className="font-bold text-yellow-600">{loyaltyInfo.goldCoins} coins</Text>
+              </View>
+              
+              <View className="flex-row justify-between items-center">
+                <Text className="text-gray-700">Coins to Redeem:</Text>
+                <View className="flex-row items-center space-x-2">
+                  <TouchableOpacity
+                    onPress={() => setGoldCoinsToRedeem(Math.max(0, goldCoinsToRedeem - 1))}
+                    className="bg-yellow-200 rounded-full w-8 h-8 items-center justify-center"
+                  >
+                    <Text className="text-yellow-800 font-bold">-</Text>
+                  </TouchableOpacity>
+                  <Text className="font-bold text-lg w-12 text-center">{goldCoinsToRedeem}</Text>
+                  <TouchableOpacity
+                    onPress={() => setGoldCoinsToRedeem(Math.min(loyaltyInfo.goldCoins, subtotal, goldCoinsToRedeem + 1))}
+                    className="bg-yellow-200 rounded-full w-8 h-8 items-center justify-center"
+                  >
+                    <Text className="text-yellow-800 font-bold">+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <View className="flex-row justify-between items-center">
+                <Text className="text-gray-700">Discount Amount:</Text>
+                <Text className="font-bold text-green-600">LKR {goldCoinDiscount.toFixed(2)}</Text>
+              </View>
+              
+              <Text className="text-xs text-gray-600">
+                1 gold coin = 1 LKR discount. Maximum discount is your total booking amount.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Quick Gold Coin Actions */}
+        {loyaltyInfo && loyaltyInfo.goldCoins !== undefined && loyaltyInfo.goldCoins > 0 && (
+          <View className="px-4 pb-2">
+            <View className="flex-row space-x-2">
+              <TouchableOpacity
+                onPress={() => setGoldCoinsToRedeem(0)}
+                className={`flex-1 p-3 rounded-lg border ${
+                  goldCoinsToRedeem === 0 
+                    ? 'bg-gray-100 border-gray-300' 
+                    : 'bg-white border-gray-300'
+                }`}
+              >
+                <Text className={`text-center font-medium ${
+                  goldCoinsToRedeem === 0 ? 'text-gray-500' : 'text-gray-700'
+                }`}>
+                  No Discount
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => setGoldCoinsToRedeem(Math.min(loyaltyInfo.goldCoins, subtotal))}
+                className={`flex-1 p-3 rounded-lg border ${
+                  goldCoinsToRedeem === Math.min(loyaltyInfo.goldCoins, subtotal)
+                    ? 'bg-yellow-100 border-yellow-400' 
+                    : 'bg-white border-gray-300'
+                }`}
+              >
+                <Text className={`text-center font-medium ${
+                  goldCoinsToRedeem === Math.min(loyaltyInfo.goldCoins, subtotal)
+                    ? 'text-yellow-800' 
+                    : 'text-gray-700'
+                }`}>
+                  Max Discount
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Selection Status */}
         {court && (court.minBookingDuration || court.maxBookingDuration) && (

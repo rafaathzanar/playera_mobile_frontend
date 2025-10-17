@@ -483,6 +483,50 @@ class ApiService {
     });
   }
 
+  // Enhanced Loyalty APIs
+  async getLoyaltyProfile(customerId) {
+    return await this.request(`/loyalty/profile?customerId=${customerId}`);
+  }
+
+  async earnFromBooking(customerId, bookingAmount, bookingId) {
+    return await this.request(
+      `/loyalty/earn/booking?customerId=${customerId}&bookingAmount=${bookingAmount}&bookingId=${bookingId}`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async earnFromReview(customerId, reviewId) {
+    return await this.request(
+      `/loyalty/earn/review?customerId=${customerId}&reviewId=${reviewId}`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async redeemGoldCoins(customerId, coinsToRedeem, bookingReference) {
+    return await this.request(
+      `/loyalty/redeem/gold-coins?customerId=${customerId}&coinsToRedeem=${coinsToRedeem}&bookingReference=${bookingReference}`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async calculateAvailableDiscount(customerId, bookingAmount) {
+    return await this.request(
+      `/loyalty/calculate-discount?customerId=${customerId}&bookingAmount=${bookingAmount}`
+    );
+  }
+
+  async getLoyaltyTransactions(customerId, limit = 10) {
+    return await this.request(
+      `/loyalty/transactions?customerId=${customerId}&limit=${limit}`
+    );
+  }
+
   // User Profile APIs
   async getUserProfile() {
     return await this.request("/users/profile");

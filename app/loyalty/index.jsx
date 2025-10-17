@@ -17,11 +17,15 @@ export default function LoyaltyPage() {
   const loadLoyaltyInfo = async () => {
     try {
       setLoading(true);
-      const data = await api.getLoyaltyInfo();
+      // Get customer ID from auth context or user profile
+      const userProfile = await api.getUserProfile();
+      const data = await api.getLoyaltyProfile(userProfile.userId);
+      console.log('Loyalty data loaded:', data);
       setLoyaltyInfo(data);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load loyalty information');
       console.error('Error loading loyalty info:', error);
+      // Don't show alert, just set to null to show fallback message
+      setLoyaltyInfo(null);
     } finally {
       setLoading(false);
     }
@@ -46,7 +50,8 @@ export default function LoyaltyPage() {
     switch (tier) {
       case 'PLATINUM':
         return [
-          '20% discount on all bookings',
+          '15% discount on all bookings',
+          '5% Gold Coins per booking',
           'Priority customer support',
           'Free equipment rental (up to 2 hours)',
           'Exclusive venue access',
@@ -54,20 +59,23 @@ export default function LoyaltyPage() {
         ];
       case 'GOLD':
         return [
-          '15% discount on all bookings',
+          '10% discount on all bookings',
+          '4% Gold Coins per booking',
           'Priority customer support',
           'Free equipment rental (up to 1 hour)',
           'Advance booking (up to 60 days)'
         ];
       case 'SILVER':
         return [
-          '10% discount on all bookings',
+          '5% discount on all bookings',
+          '3% Gold Coins per booking',
           'Standard customer support',
           'Advance booking (up to 45 days)'
         ];
       case 'BRONZE':
         return [
-          '5% discount on all bookings',
+          'No automatic discount',
+          '2% Gold Coins per booking',
           'Standard customer support',
           'Advance booking (up to 30 days)'
         ];
@@ -111,23 +119,26 @@ export default function LoyaltyPage() {
 
       <ScrollView className="flex-1">
         {/* Current Tier Display */}
-        <View className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 mx-4 mt-4 rounded-lg">
+        <View className="bg-blue-500 p-6 mx-4 mt-4 rounded-lg">
           <View className="items-center">
             <View 
               className="w-20 h-20 rounded-full items-center justify-center mb-4"
-              style={{ backgroundColor: getTierColor(loyaltyInfo.currentTier) }}
+              style={{ backgroundColor: getTierColor(loyaltyInfo.currentTier || 'BRONZE') }}
             >
               <Ionicons 
                 name="star" 
                 size={40} 
-                color={loyaltyInfo.currentTier === 'PLATINUM' ? '#000' : '#fff'} 
+                color={(loyaltyInfo.currentTier || 'BRONZE') === 'PLATINUM' ? '#000' : '#fff'} 
               />
             </View>
             <Text className="text-white text-2xl font-bold mb-2">
-              {loyaltyInfo.currentTier} TIER
+              {loyaltyInfo.currentTier || 'BRONZE'} TIER
             </Text>
             <Text className="text-white text-lg">
-              {loyaltyInfo.currentPoints} Points
+              {loyaltyInfo.currentPoints || 0} Points
+            </Text>
+            <Text className="text-white text-lg">
+              🪙 {loyaltyInfo.goldCoins || 0} Gold Coins
             </Text>
           </View>
         </View>
@@ -190,14 +201,20 @@ export default function LoyaltyPage() {
         <View className="p-4">
           <Text className="text-lg font-bold mb-4">Discount Information</Text>
           <View className="bg-green-50 rounded-lg p-4">
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-700">Discount Multiplier</Text>
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-gray-700">Tier Discount</Text>
               <Text className="text-green-600 font-bold">
                 {((1 - loyaltyInfo.discountMultiplier) * 100).toFixed(0)}% OFF
               </Text>
             </View>
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-gray-700">Gold Coins Available</Text>
+              <Text className="text-yellow-600 font-bold">
+                🪙 {loyaltyInfo.goldCoins} coins
+              </Text>
+            </View>
             <Text className="text-gray-500 text-sm mt-2">
-              This discount is automatically applied to all your bookings
+              Tier discount is automatically applied. Gold coins can be redeemed for additional discounts (1 coin = 1 LKR).
             </Text>
           </View>
         </View>
@@ -210,15 +227,24 @@ export default function LoyaltyPage() {
               {loyaltyInfo.recentTransactions.slice(0, 5).map((transaction, index) => (
                 <View key={index} className="flex-row justify-between items-center py-2 border-b border-gray-200">
                   <View>
-                    <Text className="font-semibold">{transaction.type}</Text>
+                    <Text className="font-semibold">{transaction.displayName}</Text>
                     <Text className="text-gray-600 text-sm">{transaction.description}</Text>
                   </View>
                   <View className="items-end">
-                    <Text className={`font-bold ${
-                      transaction.points > 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {transaction.points > 0 ? '+' : ''}{transaction.points} pts
-                    </Text>
+                    <View className="flex-row items-center">
+                      <Text className={`font-bold ${
+                        transaction.pointsChange > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {transaction.pointsChange > 0 ? '+' : ''}{transaction.pointsChange} pts
+                      </Text>
+                      {transaction.goldCoinsChange !== 0 && (
+                        <Text className={`ml-2 font-bold ${
+                          transaction.goldCoinsChange > 0 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {transaction.goldCoinsChange > 0 ? '+' : ''}{transaction.goldCoinsChange} 🪙
+                        </Text>
+                      )}
+                    </View>
                     <Text className="text-gray-500 text-sm">
                       {new Date(transaction.transactionDate).toLocaleDateString()}
                     </Text>
@@ -231,30 +257,30 @@ export default function LoyaltyPage() {
 
         {/* How to Earn Points */}
         <View className="p-4">
-          <Text className="text-lg font-bold mb-4">How to Earn Points</Text>
+          <Text className="text-lg font-bold mb-4">How to Earn Rewards</Text>
           <View className="bg-yellow-50 rounded-lg p-4">
             <View className="flex-row items-center mb-3">
               <Ionicons name="calendar" size={20} color="#F59E0B" />
               <Text className="ml-2 font-semibold">Complete Bookings</Text>
             </View>
             <Text className="text-gray-700 mb-3">
-              Earn 100 points for every completed booking
-            </Text>
-            
-            <View className="flex-row items-center mb-3">
-              <Ionicons name="card" size={20} color="#F59E0B" />
-              <Text className="ml-2 font-semibold">Spend Money</Text>
-            </View>
-            <Text className="text-gray-700 mb-3">
-              Earn 10 points for every LKR 1 spent
+              Earn 0.5 points + gold coins (based on tier) for every LKR 1 spent
             </Text>
             
             <View className="flex-row items-center mb-3">
               <Ionicons name="star" size={20} color="#F59E0B" />
               <Text className="ml-2 font-semibold">Leave Reviews</Text>
             </View>
+            <Text className="text-gray-700 mb-3">
+              Earn 50 points + 10 gold coins for every review submitted
+            </Text>
+            
+            <View className="flex-row items-center mb-3">
+              <Ionicons name="trophy" size={20} color="#F59E0B" />
+              <Text className="ml-2 font-semibold">Higher Tiers</Text>
+            </View>
             <Text className="text-gray-700">
-              Earn 50 points for every review submitted
+              Earn more gold coins as you progress through tiers (Bronze: 1x, Silver: 1.2x, Gold: 1.5x, Platinum: 2x)
             </Text>
           </View>
         </View>

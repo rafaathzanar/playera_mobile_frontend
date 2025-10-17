@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { icons } from "../../constants";
 import { Loader } from "../../components";
 import notificationService from "../../services/notificationService";
+import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 const TabIcon = ({ icon, color, name, focused, badgeCount }) => {
   return (
@@ -46,6 +48,7 @@ const TabIcon = ({ icon, color, name, focused, badgeCount }) => {
 
 const TabLayout = () => {
   const [unreadCount, setUnreadCount] = useState(0);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -60,10 +63,12 @@ const TabLayout = () => {
     fetchUnreadCount();
     
     // Refresh count every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(() => {
+      fetchUnreadCount();
+    }, 30000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.userId]);
 
   return (
     <>
@@ -141,7 +146,7 @@ const TabLayout = () => {
               <TabIcon
                 icon={icons.profile}
                 color={color}
-               
+                name="profile"
                 focused={focused}
               />
             ),

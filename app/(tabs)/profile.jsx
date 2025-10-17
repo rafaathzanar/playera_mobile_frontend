@@ -192,6 +192,7 @@ const ProfileScreen = () => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [loyaltyInfo, setLoyaltyInfo] = useState(null);
 
   // Load user profile when screen comes into focus
   useFocusEffect(
@@ -225,6 +226,21 @@ const ProfileScreen = () => {
         phone: profileData.phone || "",
         profileImage: profileData.profileImage || null,
       });
+
+      // Load loyalty information
+      try {
+        if (authUser?.userId) {
+          const loyaltyData = await api.getLoyaltyProfile(authUser.userId);
+          setLoyaltyInfo(loyaltyData);
+          console.log("Loyalty data received:", loyaltyData);
+        } else {
+          console.log("No authenticated user, skipping loyalty data load");
+        }
+      } catch (loyaltyError) {
+        console.error("Error loading loyalty info:", loyaltyError);
+        // Don't fail the entire profile load if loyalty fails
+        setLoyaltyInfo(null);
+      }
     } catch (error) {
       console.error("Error loading profile:", error);
       // If API fails, use AuthContext data as fallback
@@ -332,6 +348,10 @@ const ProfileScreen = () => {
     router.push("/profile/change-password");
   };
 
+  const handleLoyaltyProgram = () => {
+    router.push("/loyalty");
+  };
+
   const menuItems = [
     {
       items: [
@@ -339,6 +359,12 @@ const ProfileScreen = () => {
           icon: "history",
           label: "Booking History",
           action: handleBookingHistory,
+        },
+        {
+          icon: "star",
+          label: "Loyalty Program",
+          color: "#FFD700",
+          action: handleLoyaltyProgram,
         },
         {
           icon: "lock",
@@ -390,6 +416,25 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Gold Coins Display */}
+      {loyaltyInfo && (
+        <View style={styles.goldCoinsSection}>
+          <View style={styles.goldCoinsCard}>
+            <View style={styles.goldCoinsHeader}>
+              <Text style={styles.goldCoinIcon}>🪙</Text>
+              <Text style={styles.goldCoinsTitle}>Gold Coins</Text>
+            </View>
+            <View style={styles.goldCoinsContent}>
+              <Text style={styles.goldCoinsCount}>{loyaltyInfo.goldCoins || 0}</Text>
+              <Text style={styles.goldCoinsSubtitle}>Available for discounts</Text>
+            </View>
+            <View style={styles.loyaltyTierBadge}>
+              <Text style={styles.loyaltyTierText}>{loyaltyInfo.currentTier} Tier</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Menu Items */}
       <View style={styles.menu}>
@@ -512,6 +557,65 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  goldCoinsSection: {
+    marginBottom: 20,
+  },
+  goldCoinsCard: {
+    backgroundColor: "#FFF8DC",
+    borderRadius: 15,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+    shadowColor: "#FFD700",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  goldCoinsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  goldCoinIcon: {
+    fontSize: 24,
+    color: "#FFD700",
+    marginRight: 8,
+  },
+  goldCoinsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#B8860B",
+  },
+  goldCoinsContent: {
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  goldCoinsCount: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 5,
+  },
+  goldCoinsSubtitle: {
+    fontSize: 14,
+    color: "#B8860B",
+  },
+  loyaltyTierBadge: {
+    backgroundColor: "#FFD700",
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: "center",
+  },
+  loyaltyTierText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#B8860B",
   },
   menu: {
     borderRadius: 15,

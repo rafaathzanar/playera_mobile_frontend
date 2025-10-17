@@ -39,7 +39,12 @@ export default function OrderSummary() {
     selectedSlots: JSON.parse(params.selectedSlots || '[]'),
     timeSlotRanges: JSON.parse(params.timeSlotRanges || '[]'), // NEW: Parse time slot ranges
     selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
-    customerId: params.customerId
+    customerId: params.customerId,
+    // Loyalty-related parameters
+    goldCoinsToRedeem: params.goldCoinsToRedeem || '0',
+    loyaltyTier: params.loyaltyTier || 'BRONZE',
+    tierDiscount: parseFloat(params.tierDiscount) || 0,
+    goldCoinDiscount: parseFloat(params.goldCoinDiscount) || 0
   });
 
   // Update the state when params change
@@ -61,7 +66,12 @@ export default function OrderSummary() {
       selectedSlots: JSON.parse(params.selectedSlots || '[]'),
       timeSlotRanges: JSON.parse(params.timeSlotRanges || '[]'),
       selectedEquipment: JSON.parse(params.selectedEquipment || '[]'),
-      customerId: params.customerId
+      customerId: params.customerId,
+      // Loyalty-related parameters
+      goldCoinsToRedeem: params.goldCoinsToRedeem || '0',
+      loyaltyTier: params.loyaltyTier || 'BRONZE',
+      tierDiscount: parseFloat(params.tierDiscount) || 0,
+      goldCoinDiscount: parseFloat(params.goldCoinDiscount) || 0
     });
     // Force re-render when timeSlotRanges change
     setRenderKey(prev => prev + 1);
@@ -295,6 +305,45 @@ export default function OrderSummary() {
                 <Text className="font-medium">LKR {bookingData.equipmentCost.toFixed(2)}</Text>
               </View>
             )}
+            
+            {/* Subtotal (before discounts) */}
+            {(bookingData.tierDiscount > 0 || bookingData.goldCoinDiscount > 0) && (
+              <View className="flex-row justify-between">
+                <Text className="text-gray-600">Subtotal:</Text>
+                <Text className="font-medium">LKR {(bookingData.courtCost + bookingData.equipmentCost).toFixed(2)}</Text>
+              </View>
+            )}
+            
+            {/* Loyalty Discounts */}
+            {(bookingData.tierDiscount > 0 || bookingData.goldCoinDiscount > 0) && (
+              <>
+                <View className="border-t border-gray-300 pt-2 mt-2">
+                  <Text className="text-sm font-semibold text-green-600 mb-2">Loyalty Discounts</Text>
+                </View>
+                
+                {bookingData.tierDiscount > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-gray-600">Tier Discount ({bookingData.loyaltyTier}):</Text>
+                    <Text className="font-medium text-green-600">-LKR {bookingData.tierDiscount.toFixed(2)}</Text>
+                  </View>
+                )}
+                
+                {bookingData.goldCoinDiscount > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-gray-600">Gold Coins ({bookingData.goldCoinsToRedeem} coins):</Text>
+                    <Text className="font-medium text-green-600">-LKR {bookingData.goldCoinDiscount.toFixed(2)}</Text>
+                  </View>
+                )}
+                
+                <View className="flex-row justify-between">
+                  <Text className="text-gray-600">Total Discount:</Text>
+                  <Text className="font-medium text-green-600">
+                    -LKR {(bookingData.tierDiscount + bookingData.goldCoinDiscount).toFixed(2)}
+                  </Text>
+                </View>
+              </>
+            )}
+            
             <View className="border-t border-gray-300 pt-2 mt-2">
               <View className="flex-row justify-between items-center">
                 <Text className="text-lg font-semibold text-orange-800">Total Cost</Text>
